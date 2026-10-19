@@ -1,112 +1,177 @@
+/*
+ * Rain on glass — a TSL (WebGPU) port of "Heartfelt"
+ *
+ *   Original: "Heartfelt" by Martijn Steinrucken aka BigWings, 2017
+ *   https://www.shadertoy.com/view/ltffzl
+ *   License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported
+ *            https://creativecommons.org/licenses/by-nc-sa/3.0/
+ *
+ * As required by that license, this file (a derivative work) is shared under the same
+ * CC BY-NC-SA 3.0 license.
+ *
+ * What is ported 1:1: N13 / N hashes, Saw, DropLayer2, StaticDrops, Drops, the
+ * three-tap normals, the focus/blur logic, the colour shift and the lightning flicker.
+ *
+ * Changes for this project:
+ *  - runs on the window glass quad instead of full screen; `iChannel0` is replaced by the
+ *    real rendered scene behind the glass (viewportMipTexture), so drops refract the
+ *    outside view and stay correct when the camera orbits/zooms
+ *  - rainAmount comes from live weather; like the original's iMouse, dragging on the window
+ *    sets it (vertical) and scrubs drop time (horizontal)
+ *  - fog/blur scales with the weather so a dry window is clear
+ *  - the HAS_HEART story mode, zoom animation, vignette and fade-in are not used
+ *  - lightning is computed on the CPU (same formula) so it can also flash the room lights
+ */
 import * as THREE from 'three/webgpu';
 import {
-  abs, clamp, dot, float, floor, fract, length, max, mix, screenUV, sin, smoothstep, step, time, uniform, uv, vec2, vec3,
+  abs, clamp, dot, float, floor, fract, length, max, mix, screenUV, sin, sqrt, time, uniform, uv, vec2, vec3,
   viewportMipTexture,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
-/**
- * Rain on glass (TSL, WebGPU + WebGL2 fallback). Original implementation.
- *
- *  - sliding drops: each grid cell holds one drop that sticks, then slides down (two layers)
- *  - trails: small beads left behind a sliding drop, and a wet path that wipes the condensation
- *  - static beads: tiny droplets that land, sit and evaporate
- *  - condensation: the view behind is blurred (mip level) except inside drops and trails
- *  - refraction: every drop acts as a small lens on the real rendered scene behind the glass
- *    (viewportMipTexture), so it stays correct when the camera orbits or zooms
- *
- * Glass UVs from the GLB have v = 0 at the TOP, so `st` flips them: st.y points up.
- */
-
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
+type V3 = Node<'vec3'>;
 
-const hash12 = (p: V2): F => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
-const hash22 = (p: V2): V2 => vec2(hash12(p), hash12(p.add(vec2(37.2, 17.9))));
-/** 1 inside `a`, fading to 0 at `b` (a < b) */
-const inside = (a: F | number, b: F | number, x: F): F => float(1).sub(smoothstep(a, b, x));
+const f = (x: F | number): F => (typeof x === 'number' ? float(x) : x);
 
-interface Layer { off: V2; cov: F; clear: F }
+/** #define S(a, b, t) smoothstep(a, b, t) — written out so reversed edges (a > b) behave as in GLSL */
+const S = (a: F | number, b: F | number, t: F): F => {
+  const A = f(a);
+  const B = f(b);
+  const x = clamp(t.sub(A).div(B.sub(A)), 0, 1);
+  return x.mul(x).mul(float(3).sub(x.mul(2)));
+};
 
-/** Drops that stick, then slide down, leaving beads and a wet, clear trail. */
-function slidingDrops(st: V2, t: F, cols: number, rows: number, amount: F, seed: number): Layer {
-  const g = st.mul(vec2(cols, rows)).add(vec2(0, t.mul(0.12)));
-  const id = floor(g).add(seed);
-  const f = fract(g).sub(0.5);
-  const n = hash22(id);
-  const on = step(hash12(id.add(5.31)), amount);
+/** N13 — hash by Dave Hoskins */
+const N13 = (p: F): V3 => {
+  let p3 = fract(vec3(p, p, p).mul(vec3(0.1031, 0.11369, 0.13787)));
+  p3 = p3.add(dot(p3, p3.yzx.add(19.19)));
+  return fract(vec3(p3.x.add(p3.y).mul(p3.z), p3.x.add(p3.z).mul(p3.y), p3.y.add(p3.z).mul(p3.x)));
+};
 
-  const phase = fract(t.mul(n.y.mul(0.25).add(0.12)).add(n.x));
-  const py = float(0.38).sub(smoothstep(0.5, 0.95, phase).mul(0.76));          // stick … then slide
-  const fade = smoothstep(0.0, 0.06, phase).mul(inside(0.9, 1.0, phase)).mul(on);
-  const px = n.x.sub(0.5).mul(0.55).add(sin(f.y.mul(7).add(n.y.mul(6.283))).mul(0.035));
+const N = (t: F): F => fract(sin(t.mul(12345.564)).mul(7658.76));
 
-  const k = cols / rows; // keeps drops round in glass space
-  const p = vec2(f.x.sub(px), f.y.sub(py).mul(k));
-  const r = n.y.mul(0.05).add(0.12);
-  const drop = inside(r.mul(0.7), r, length(p)).mul(fade);
+const Saw = (b: number, t: F): F => S(0, b, t).mul(S(1, b, t));
 
-  const above = f.y.sub(py);
-  const trail = smoothstep(-0.02, 0.04, above).mul(inside(0.0, 0.55, above)).mul(fade);
-  const by = fract(above.mul(8)).sub(0.5).div(8).mul(k);
-  const bp = vec2(p.x, by);
-  const bead = inside(0.012, 0.03, length(bp)).mul(trail).mul(inside(0.0, 0.4, above));
-  const clear = trail.mul(inside(0.03, 0.1, abs(p.x)));
+/** DropLayer2 → vec2(drop mask, trail) */
+function DropLayer2(uvIn: V2, t: F): V2 {
+  const UV = uvIn;
+  const uvA = vec2(uvIn.x, uvIn.y.add(t.mul(0.75)));
+  const a = vec2(6, 1);
+  const grid = a.mul(2);
+  const id0 = floor(uvA.mul(grid));
 
-  const off = p.mul(drop).add(bp.mul(bead)).mul(-2.6 / cols);
-  return { off, cov: max(drop, bead), clear };
+  const colShift = N(id0.x);
+  const uvB = vec2(uvA.x, uvA.y.add(colShift));
+
+  const id = floor(uvB.mul(grid));
+  const n = N13(id.x.mul(35.2).add(id.y.mul(2376.1)));
+  const st = fract(uvB.mul(grid)).sub(vec2(0.5, 0));
+
+  const x0 = n.x.sub(0.5);
+  const yw = UV.y.mul(20);
+  const wiggle = sin(yw.add(sin(yw)));
+  const x = x0.add(wiggle.mul(float(0.5).sub(abs(x0))).mul(n.z.sub(0.5))).mul(0.7);
+  const ti = fract(t.add(n.z));
+  const y = Saw(0.85, ti).sub(0.5).mul(0.9).add(0.5);
+  const p = vec2(x, y);
+
+  const d = length(st.sub(p).mul(a.yx));
+  const mainDrop = S(0.4, 0.0, d);
+
+  const r = sqrt(S(1.0, y, st.y));
+  const cd = abs(st.x.sub(x));
+  const trailFront = S(-0.02, 0.02, st.y.sub(y));
+  const trail = S(r.mul(0.23), r.mul(r).mul(0.15), cd).mul(trailFront).mul(r).mul(r);
+
+  // (the original's first `droplets` value is overwritten, so only this one matters)
+  const yd = fract(UV.y.mul(10)).add(st.y.sub(0.5));
+  const dd = length(st.sub(vec2(x, yd)));
+  const droplets = S(0.3, 0.0, dd);
+  const m = mainDrop.add(droplets.mul(r).mul(trailFront));
+
+  return vec2(m, trail);
 }
 
-/** Small droplets that appear, sit and evaporate. */
-function staticBeads(st: V2, t: F, cells: number, amount: F, seed: number): Layer {
-  const g = st.mul(cells);
-  const id = floor(g).add(seed);
-  const f = fract(g).sub(0.5);
-  const n = hash22(id);
-  const life = fract(t.mul(0.05).add(hash12(id.add(3.7))));
-  const fade = smoothstep(0.0, 0.08, life).mul(inside(0.5, 1.0, life)).mul(step(hash12(id.add(9.1)), amount));
-  const p = f.sub(n.sub(0.5).mul(0.6));
-  const r = n.x.mul(0.12).add(0.1);
-  const bead = inside(r.mul(0.4), r, length(p)).mul(fade);
-  return { off: p.mul(bead).mul(-2.0 / cells), cov: bead, clear: float(0) };
+function StaticDrops(uvIn: V2, t: F): F {
+  const uv40 = uvIn.mul(40);
+  const id = floor(uv40);
+  const g = fract(uv40).sub(0.5);
+  const n = N13(id.x.mul(107.45).add(id.y.mul(3543.654)));
+  const p = n.xy.sub(0.5).mul(0.7);
+  const d = length(g.sub(p));
+  const fade = Saw(0.025, fract(t.add(n.z)));
+  return S(0.3, 0.0, d).mul(fract(n.z.mul(10))).mul(fade);
 }
 
-export function createRainGlass(glass: THREE.Mesh) {
-  const rain = uniform(0);        // 0–1 drop amount
-  const fog = uniform(0);         // 0–1 condensation
-  const speed = uniform(1);       // storm runs faster
-  const axisU = uniform(new THREE.Vector2(0.1, 0)); // glass st (1,0) in screen-uv units
-  const axisV = uniform(new THREE.Vector2(0, -0.1)); // glass st (0,1) in screen-uv units
-  const tintDay = new THREE.Color('#dfe9ee');
-  const tintNight = new THREE.Color('#2b3350');
-  const tintC = new THREE.Color();
-  const tint = uniform(new THREE.Vector3(tintDay.r, tintDay.g, tintDay.b));
+/** Drops → vec2(coverage, trail) */
+function Drops(uvIn: V2, t: F, l0: F, l1: F, l2: F): V2 {
+  const s = StaticDrops(uvIn, t).mul(l0);
+  const m1 = DropLayer2(uvIn, t).mul(l1);
+  const m2 = DropLayer2(uvIn.mul(1.85), t).mul(l2);
+  const c = S(0.3, 1.0, s.add(m1.x).add(m2.x));
+  return vec2(c, max(m1.y.mul(l0), m2.y.mul(l1)));
+}
 
+/** The original's lightning flicker (USE_POST_PROCESSING), t = (T + 3) * 0.5 */
+function lightningAt(t: number): number {
+  return Math.sin(t * Math.sin(t * 10)) * Math.pow(Math.max(0, Math.sin(t + Math.sin(t))), 10);
+}
+
+export interface RainGlassOptions {
+  dom: HTMLElement;
+  camera: THREE.Camera;
+  /** orbit controls (disabled while dragging on the glass) */
+  controls: { enabled: boolean };
+}
+
+export function createRainGlass(glass: THREE.Mesh, opts: RainGlassOptions) {
+  const rainAmount = uniform(0);   // 0–1, the original's rainAmount
+  const fog = uniform(0);          // 0 = clear dry glass … 1 = full Heartfelt fog
+  const speed = uniform(1);
+  const scrub = uniform(0);        // the original's iMouse.x * 2 time offset
+  const lightning = uniform(0);
+  const dropScale = uniform(1.0);  // drop size: <1 bigger drops, >1 smaller
+  const blurScale = uniform(0.85); // mip-level scale for this screen size
+  const axisU = uniform(new THREE.Vector2(0.1, 0)); // glass uv (1,0) in screen-uv units
+  const axisV = uniform(new THREE.Vector2(0, -0.1)); // glass uv (0,1) in screen-uv units
+
+  // glass UVs from the GLB have v = 0 at the top; Heartfelt expects y up
   const st = vec2(uv().x, float(1).sub(uv().y));
-  const t = time.mul(speed);
+  const T = time.mul(speed).add(scrub);
+  const t = T.mul(0.2);
+  const p = st.sub(0.5).mul(dropScale);
 
-  const a = slidingDrops(st, t, 5, 2, rain, 0);
-  const b = slidingDrops(st, t.add(3.1), 9, 3, rain.mul(0.8), 17);
-  const s = staticBeads(st, t, 26, clamp(rain.mul(1.3), 0, 1), 41);
+  const maxBlur = mix(float(3), float(6), rainAmount);
+  const minBlur = float(2);
+  const staticDrops = S(-0.5, 1.0, rainAmount).mul(2);
+  const layer1 = S(0.25, 0.75, rainAmount);
+  const layer2 = S(0.0, 0.5, rainAmount);
 
-  const off = a.off.add(b.off).add(s.off);
-  const cov = clamp(a.cov.add(b.cov).add(s.cov), 0, 1);
-  const clear = clamp(a.clear.add(b.clear), 0, 1);
-  const mist = fog.mul(float(1).sub(clear)).mul(float(1).sub(cov));
+  const c = Drops(p, t, staticDrops, layer1, layer2);
+  const e = 0.001;
+  const cx = Drops(p.add(vec2(e, 0)), t, staticDrops, layer1, layer2).x;
+  const cy = Drops(p.add(vec2(0, e)), t, staticDrops, layer1, layer2).x;
+  const n = vec2(cx.sub(c.x), cy.sub(c.x)); // "expensive normals"
 
-  const screenOff = vec2(axisU).mul(off.x).add(vec2(axisV).mul(off.y));
-  // viewportMipTexture is typed as a bare Node in @types/three; it is a vec4 texture sample
-  const behind = (viewportMipTexture(screenUV.add(screenOff), mist.mul(5.0)) as unknown as Node<'vec4'>).rgb;
-  const ring = cov.mul(float(1).sub(cov)).mul(4);
-  let col = mix(behind, vec3(tint), mist.mul(0.12).add(0.03));
-  col = col.mul(float(1).sub(ring.mul(0.35))).add(cov.mul(0.03));
+  const focus = mix(maxBlur.sub(c.y), minBlur, S(0.1, 0.2, c.x));
+  const offset = vec2(axisU).mul(n.x).add(vec2(axisV).mul(n.y));
+  const sample = viewportMipTexture(screenUV.add(offset), focus.mul(blurScale).mul(fog)) as unknown as Node<'vec4'>;
+  let col = sample.rgb;
+
+  // USE_POST_PROCESSING: subtle colour shift + lightning (vignette/fade are full-screen only)
+  const tt = T.add(3).mul(0.5);
+  const colFade = sin(tt.mul(0.2)).mul(0.5).add(0.5);
+  col = col.mul(mix(vec3(1, 1, 1), vec3(0.8, 0.9, 1.3), colFade.mul(fog).mul(0.6)));
+  col = col.mul(float(1).add(lightning));
 
   const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
-  material.name = 'M_WindowGlass_Rain';
+  material.name = 'M_WindowGlass_Heartfelt';
   material.colorNode = col;
   glass.material = material;
 
-  // glass corners (by UV) for mapping glass-space offsets to the screen
+  // ---- glass corners → screen axes (refraction offsets follow the camera)
   const pos = glass.geometry.getAttribute('position');
   const uvs = glass.geometry.getAttribute('uv');
   const corner = (u: number, v: number) => {
@@ -126,19 +191,70 @@ export function createRainGlass(glass: THREE.Mesh) {
     return new THREE.Vector2((w.x + 1) / 2, (1 - w.y) / 2);
   };
 
-  const eased = { rain: 0, fog: 0 };
+  // ---- interaction: drag on the glass like the original's iMouse
+  const drag = { active: false, x: 0, y: 0, used: false };
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const glassUV = (ev: PointerEvent): THREE.Vector2 | null => {
+    const r = opts.dom.getBoundingClientRect();
+    ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, opts.camera);
+    return ray.intersectObject(glass, false)[0]?.uv ?? null;
+  };
+  const updateDrag = (hit: THREE.Vector2) => {
+    drag.x = hit.x;
+    drag.y = 1 - hit.y; // y up
+  };
+  // capture phase so this runs before OrbitControls and can stop the orbit
+  opts.dom.addEventListener('pointerdown', (ev) => {
+    const hit = glassUV(ev);
+    if (!hit) return;
+    drag.active = true;
+    drag.used = true;
+    updateDrag(hit);
+    opts.controls.enabled = false;
+    opts.dom.setPointerCapture(ev.pointerId);
+  }, { capture: true });
+  opts.dom.addEventListener('pointermove', (ev) => {
+    if (!drag.active) return;
+    const hit = glassUV(ev);
+    if (hit) updateDrag(hit);
+  });
+  const end = (ev: PointerEvent) => {
+    if (!drag.active) return;
+    drag.active = false;
+    opts.controls.enabled = true;
+    if (opts.dom.hasPointerCapture(ev.pointerId)) opts.dom.releasePointerCapture(ev.pointerId);
+  };
+  opts.dom.addEventListener('pointerup', end);
+  opts.dom.addEventListener('pointercancel', end);
+
+  const eased = { rain: 0, fog: 0, storm: 0, scrub: 0 };
+  let clock = 0;
+
   return {
     material,
-    /** `day` is the eased 0 (night) … 1 (day) level from Lighting */
-    update(dt: number, camera: THREE.Camera, target: { rain: number; fog: number; storm: boolean; day: number }) {
-      const k = 1 - Math.exp(-dt * 0.8);
-      eased.rain += (target.rain - eased.rain) * k;
-      eased.fog += (target.fog - eased.fog) * k * 0.6;
-      rain.value = eased.rain;
+    /** true while the visitor is dragging on the window */
+    get dragging() { return drag.active; },
+    /** current lightning flash (0 … ~1), for the room lights */
+    get flash() { return lightning.value; },
+
+    update(dt: number, camera: THREE.Camera, target: { rain: number; fog: number; storm: boolean }) {
+      const k = 1 - Math.exp(-dt * (drag.active ? 6 : 0.8));
+      const rainTarget = drag.active ? drag.y : target.rain;
+      eased.rain += (rainTarget - eased.rain) * k;
+      const fogTarget = drag.active ? Math.max(target.fog, 0.6 + 0.4 * drag.y) : target.fog;
+      eased.fog += (fogTarget - eased.fog) * k * 0.6;
+      eased.storm += ((target.storm ? 1 : 0) - eased.storm) * (1 - Math.exp(-dt));
+      if (drag.used) eased.scrub += (drag.x * 2 - eased.scrub) * (1 - Math.exp(-dt * 8));
+
+      rainAmount.value = eased.rain;
       fog.value = eased.fog;
-      speed.value += ((target.storm ? 1.5 : 1) - speed.value) * k;
-      tintC.lerpColors(tintNight, tintDay, target.day);
-      tint.value.set(tintC.r, tintC.g, tintC.b);
+      scrub.value = eased.scrub;
+      speed.value += ((target.storm ? 1.4 : 1) - speed.value) * k;
+
+      clock += dt * speed.value;
+      lightning.value = Math.max(0, lightningAt((clock + eased.scrub + 3) * 0.5)) * eased.storm;
 
       const s0 = toScreen(c00, camera);
       axisU.value.copy(toScreen(c10, camera)).sub(s0);

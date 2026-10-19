@@ -53,7 +53,7 @@ async function main() {
 
   const lighting = new Lighting(scene, room);
   const outside = createOutsideView(room);
-  const glass = createRainGlass(room.node<THREE.Mesh>('Window_Glass'));
+  const glass = createRainGlass(room.node<THREE.Mesh>('Window_Glass'), { dom: renderer.domElement, camera, controls });
   const monitor = createScreen(room);
   const music = createMusic();
   const headphones = room.node('Headphones');
@@ -100,11 +100,9 @@ async function main() {
         registerMotion();
         monitor.next();
         break;
-      case 'window': {
-        const w = currentWeather();
-        toast(`Outside: ${w.condition}${state.weather.live ? `, ${Math.round(state.weather.live.temperature)}°C` : ''}`);
+      case 'window':
+        toast('Hold and drag on the window: up/down = rain, left/right = time');
         break;
-      }
       case 'clock': {
         const h = currentHour();
         toast(`It's ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')} in the room`);
@@ -143,9 +141,10 @@ async function main() {
     minuteHand.rotation.z = ((h % 1) * Math.PI * 2);
     hourHand.rotation.z = (((h % 12) / 12) * Math.PI * 2);
 
+    lighting.flash = glass.flash;
     lighting.update(dt, now);
     const L = lighting.levels;
-    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain });
+    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain, flash: glass.flash });
     monitor.update(dt, L.awake);
     music.update(dt);
     // headphones sway on the stand with the music (Sound_Bump overrides this while it plays)
@@ -154,9 +153,8 @@ async function main() {
     headphones.rotation.x += (swing - headphones.rotation.x) * Math.min(1, dt * 10);
     glass.update(dt, camera, {
       rain: w.rain,
-      fog: Math.min(1, w.rain * 0.6 + (w.condition === 'fog' ? 0.5 : 0)),
+      fog: Math.min(1, w.rain * 1.6 + (w.condition === 'fog' ? 0.5 : 0)),
       storm: w.condition === 'storm',
-      day: L.day,
     });
     room.update(dt);
     controls.update();

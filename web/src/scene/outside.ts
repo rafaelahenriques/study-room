@@ -140,6 +140,8 @@ export interface OutsideInputs {
   day: number;      // 0 night … 1 day (eased)
   overcast: number; // 0 … 1 (eased)
   rain: number;     // 0 … 1 (eased)
+  /** lightning flash 0 … ~1 */
+  flash?: number;
 }
 
 export function createOutsideView(room: Room) {
@@ -192,8 +194,8 @@ export function createOutsideView(room: Room) {
     update(i: OutsideInputs) {
       const elev = Math.sin((Math.PI * (i.hour - 6)) / 12);
       const dawn = (1 - smoothstepJS(0.0, 0.35, Math.abs(elev))) * Math.min(1, i.day * 2);
-      setColor(u.zenith, blend(P.zenith, i, dawn));
-      setColor(u.horizon, blend(P.horizon, i, dawn));
+      setColor(u.zenith, blend(P.zenith, i, dawn).multiplyScalar(1 + 2.5 * (i.flash ?? 0)));
+      setColor(u.horizon, blend(P.horizon, i, dawn).multiplyScalar(1 + 2 * (i.flash ?? 0)));
       setColor(u.cloud, blend(P.cloud, i, dawn));
       setColor(u.hills, tmp.lerpColors(P.hills.night, P.hills.day, i.day).multiplyScalar(1 - 0.3 * i.overcast));
       setColor(u.roofs, tmp.lerpColors(P.roofs.night, P.roofs.day, i.day).multiplyScalar(1 - 0.35 * i.overcast));

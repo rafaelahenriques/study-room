@@ -30,6 +30,9 @@ export class Lighting {
   /** warm fill from the string lights, so the room reads at night */
   readonly nightFill = new THREE.PointLight(0xffc27a, 0, 4.5, 1.2);
 
+  /** lightning flash from the rain shader (0 … ~1) */
+  flash = 0;
+
   /** eased 0–1 values other modules can read */
   readonly levels = { day: 1, awake: 0, rain: 0, cloud: 0 };
 
@@ -88,7 +91,7 @@ export class Lighting {
     // sky fill
     this.hemi.color.lerpColors(PALETTE.skyNight, PALETTE.skyDay, day).lerp(PALETTE.skyGrey, overcast * 0.6 * day);
     this.hemi.groundColor.lerpColors(PALETTE.groundNight, PALETTE.groundDay, day);
-    this.hemi.intensity = 0.7 + 0.7 * day * (1 - 0.25 * overcast);
+    this.hemi.intensity = 0.7 + 0.7 * day * (1 - 0.25 * overcast) + 2.5 * this.flash;
 
     // page background (the view outside the window lives in outside.ts)
     const bg = this.scene.background as THREE.Color | null;

@@ -214,35 +214,25 @@ Map the WMO `weather_code`:
 
 ## 7. The rain-on-glass shader in TSL ✅ done
 
-`web/src/scene/rain.ts` is an **original** TSL shader. Because no Shadertoy code is copied, none of Shadertoy's non-commercial licence terms apply to your site. Here's how it works:
+`web/src/scene/rain.ts` is a TSL port of **"Heartfelt" by BigWings** (https://www.shadertoy.com/view/ltffzl, CC BY-NC-SA 3.0). The credit is in the README and in the file header.
 
-| Layer | What it does |
+| Heartfelt (GLSL) | Port (TSL) |
 |---|---|
-| Sliding drops (2 grids) | Each cell holds one drop that sticks, then slides down with a slight wobble. Its fade-in/out hides the loop restarting. |
-| Trails | Small beads are left behind each sliding drop, and a wet path wipes away the condensation. |
-| Static beads | Tiny droplets land, sit and evaporate. |
-| Condensation | The view behind the glass is blurred by sampling a lower mip level, except inside drops and trails. |
-| Refraction | Each drop works like a small lens on the real rendered scene behind the glass, via `viewportMipTexture`. The drop offsets are mapped to the screen from the glass corners every frame, so refraction stays correct when the camera orbits or zooms. |
+| `fragCoord` / `iResolution` (full screen) | the glass quad's UVs, flipped so y points up (glTF puts v = 0 at the top) |
+| `textureLod(iChannel0, UV + n, focus)` | `viewportMipTexture(screenUV + offset, focus)`, which samples the real scene behind the glass. `n` is mapped from glass space to the screen using the projected glass corners, so refraction stays correct as the camera moves. |
+| `iMouse.y` → rain amount, `iMouse.x` → time offset | hold and drag on the window (`pointerdown` in the capture phase pauses OrbitControls) |
+| `sin(T*.05)*.3+.7` automatic rain | the live weather's rain amount, eased |
+| lightning in `USE_POST_PROCESSING` | the same formula, computed on the CPU so it can also flash the hemisphere light and the sky |
+| `S(a,b,t)` with reversed edges | a hand-written smoothstep, because WGSL's `smoothstep` isn't guaranteed to accept reversed edges |
+| `HAS_HEART`, zoom, vignette, fade | not used, because they only make sense for a full-screen demo |
 
-`web/src/scene/outside.ts` paints the view the drops refract:
-- a sky gradient with the sun, or the moon at night
-- drifting clouds
-- hills and rooftops, with lit house windows at night
+**Tuning knobs** (uniforms in `createRainGlass`):
+- **Drop size:** `dropScale`.
+- **Blur strength:** `blurScale` (mip level).
+- **Fog:** `fog`. In `main.ts` it's `rain × 1.6`, plus `0.5` when foggy.
+- **Storms:** `speed` is 1.4 during a storm.
 
-Everything is driven by the time of day and the weather.
-
-**Tuning knobs:**
-- **Number of drops:** the `rain` uniform (0–1). The grids pick drops with `step(hash, amount)`.
-- **Condensation:** `fog` (in `main.ts`: `rain × 0.6`, plus `0.5` when foggy).
-- **Storms:** `speed` is 1.5 during a storm.
-- **Drop size:** `r` in `slidingDrops()` and `staticBeads()`.
-- **Grid density:** the `(cols, rows)` and `cells` arguments.
-- **Lens strength:** the `-2.6 / cols` and `-2.0 / cells` factors.
-- **Blur strength:** `mist × 5.0` (the mip level).
-
-The glass UVs in Three.js have `v = 0` at the **top** (glTF flips V), so the shader uses `st = (u, 1 − v)`.
-
-**Performance:** it ran at 120 fps (the display's limit) on WebGPU at 2× pixel density in a full storm. On slow phones, lower `cells` or drop the second sliding layer.
+**Performance:** it ran at 120 fps (the display's limit) on WebGPU at 2× pixel density in a full storm, even with the original's three-tap "expensive normals". On slow devices, switch to the original's `CHEAP_NORMALS` approach, using screen-space derivatives instead of two extra `Drops()` calls.
 
 ### The monitor screen ✅ done
 
