@@ -51,7 +51,8 @@ src/
   main.ts            renderer, camera, loop
   scene/room.ts      load GLB, find nodes by name, mixer + clip helpers
   scene/lighting.ts  sun / lamp / screen / string lights from RoomState
-  scene/rain.ts      TSL rain-on-glass material
+  shaders/*.wgsl     the Shadertoy ports (WGSL, used with wgslFn)
+  scene/rain.ts      rain-on-glass material
   scene/interact.ts  raycast hover + click
   state/roomState.ts the single state object + subscribe()
   inputs/weather.ts  Open-Meteo polling
@@ -212,27 +213,41 @@ Map the WMO `weather_code`:
 - **Polling:** check every 10–15 minutes.
 - **Night:** use `is_day` together with the local hour to decide when night begins. At night the lamp, screen and string lights carry the scene.
 
-## 7. The rain-on-glass shader in TSL ✅ done
+## 7. The rain-on-glass shader ✅ done
 
-`web/src/scene/rain.ts` is a TSL port of **"Heartfelt" by BigWings** (https://www.shadertoy.com/view/ltffzl, CC BY-NC-SA 3.0). The credit is in the README and in the file header.
+`web/src/shaders/heartfelt/fragment.wgsl` is a GLSL → **WGSL** port of **"Heartfelt" by BigWings** (https://www.shadertoy.com/view/ltffzl, CC BY-NC-SA 3.0), following the class method:
+- **Rules:** the WGSL cheat sheet.
+- **Structure:** the main function first, with the helpers (`S`, `N13`, `N`, `Saw`, `DropLayer2`, `StaticDrops`, `Drops`) below it, because `wgslFn` reads the signature of the first function.
+- **Wiring:** `web/src/scene/rain.ts` imports it with `?raw`, wraps it with `wgslFn`, and passes the Shadertoy inputs as `uniform()` nodes.
 
-| Heartfelt (GLSL) | Port (TSL) |
+| Heartfelt (GLSL) | Port (WGSL + Three.js) |
 |---|---|
-| `fragCoord` / `iResolution` (full screen) | the glass quad's UVs, flipped so y points up (glTF puts v = 0 at the top) |
-| `textureLod(iChannel0, UV + n, focus)` | `viewportMipTexture(screenUV + offset, focus)`, which samples the real scene behind the glass. `n` is mapped from glass space to the screen using the projected glass corners, so refraction stays correct as the camera moves. |
-| `iMouse.y` → rain amount, `iMouse.x` → time offset | hold and drag on the window (`pointerdown` in the capture phase pauses OrbitControls) |
-| `sin(T*.05)*.3+.7` automatic rain | the live weather's rain amount, eased |
-| lightning in `USE_POST_PROCESSING` | the same formula, computed on the CPU so it can also flash the hemisphere light and the sky |
-| `S(a,b,t)` with reversed edges | a hand-written smoothstep, because WGSL's `smoothstep` isn't guaranteed to accept reversed edges |
-| `HAS_HEART`, zoom, vignette, fade | not used, because they only make sense for a full-screen demo |
+| `void mainImage(out vec4 fragColor, in vec2 fragCoord)` | `fn heartfelt(fragCoord: vec2f, iTime: f32, iMouse: vec4f, iResolution: vec2f, iChannel0: texture_2d<f32>, iChannel0Sampler: sampler, …) -> vec4f` |
+| `fragCoord` (pixels, bottom-left origin) | `uv()` of the glass, flipped so y points up, × `iResolution` (glTF puts v = 0 at the top) |
+| `textureLod(iChannel0, UV + n, focus)` | `textureSampleLevel(iChannel0, iChannel0Sampler, screenUV + n mapped to the screen, focus)`. `iChannel0` is `viewportMipTexture()`, the scene behind the glass, passed twice as texture and sampler, like the course passes its render target. |
+| `iMouse.z > 0 ? M.y : sin(T*.05)*.3+.7` | `select(weatherRain, M.y, iMouse.z > 0.0)`. Dragging on the glass fills `iMouse` exactly like Shadertoy does (`pointerdown` in the capture phase pauses OrbitControls). |
+| `#define S(a, b, t) smoothstep(a, b, t)` | `fn S()`, written out, because it's called with reversed edges. WGSL has no preprocessor. |
+| `float`, `vec2/3`, `out` | `let`/`var`, `vec2f/3f`, return values (the cheat-sheet rules) |
+| lightning (`USE_POST_PROCESSING`) | kept in the WGSL, gated by `storm`. The same formula runs in JS to flash the room lights. |
+| `HAS_HEART`, zoom animation, vignette | not used, because they only make sense for a full-screen demo |
 
-**Tuning knobs** (uniforms in `createRainGlass`):
-- **Drop size:** `dropScale`.
-- **Blur strength:** `blurScale` (mip level).
-- **Fog:** `fog`. In `main.ts` it's `rain × 1.6`, plus `0.5` when foggy.
-- **Storms:** `speed` is 1.4 during a storm.
+**Tuning knobs** (in `createRainGlass` and the WGSL):
+- **Fog:** `fog`. In `main.ts` it's `rain × 1.6`, plus `0.5` when foggy and `0.12` when snowing, then × 0.85 as the mip-level scale.
+- **Storms:** `iTime` runs 1.4× faster during a storm.
+- **Drop size:** `zoom` in the WGSL; 1.0 means the biggest drops.
 
 **Performance:** it ran at 120 fps (the display's limit) on WebGPU at 2× pixel density in a full storm, even with the original's three-tap "expensive normals". On slow devices, switch to the original's `CHEAP_NORMALS` approach, using screen-space derivatives instead of two extra `Drops()` calls.
+
+### Snow and ambient animation ✅ done
+
+- **Snow:** `web/src/shaders/snow/fragment.wgsl` ports Shadertoy **Mdt3Df** from GLSL to WGSL (used with `wgslFn` in `outside.ts`) (https://www.shadertoy.com/view/Mdt3Df). It's composited into the outside view in `outside.ts` whenever `currentWeather().condition === 'snow'`, set by live weather (WMO codes 71–77 and 85–86) or the panel. It turns the hills and roofs white and adds a light fog to the glass. The whole loop is skipped while it isn't snowing.
+- **Rain outside:** `outside.ts` also draws thin rain streaks falling outside while it rains.
+- **Ambient animation:** `web/src/scene/ambient.ts` adds:
+  - steam rising from the mug, which starts at the `Anchor_MugSteam` empty
+  - dust motes glinting in the sunbeam, only on sunny days, positioned along `Anchor_RainGlass` → `Anchor_WindowTarget`
+  - string lights that twinkle bulb by bulb, using a TSL `emissiveNode` with a per-bulb phase from `positionLocal`
+
+  The particles are instanced quads that face the camera, with additive blending.
 
 ### The monitor screen ✅ done
 

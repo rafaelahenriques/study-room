@@ -6,14 +6,18 @@
 | `blender/isometricroom.blend` | Your original scene (never modified by the scripts) |
 | `blender/isometricroom_enriched.blend` | Generated scene with collections, materials, new props and animations |
 | `blender/build_enriched_room.py` | Rebuilds the enriched file from the original |
+| `blender/bake_ao.py` | Bakes ambient occlusion into `web/public/textures/room_ao.jpg` and adds the `AO_UV` map (exported as `TEXCOORD_1`) |
 | `blender/export_glb.py` | Writes `web/public/models/study_room.glb` |
 | `blender/render_preview.py` | EEVEE look-dev renders into `blender/previews/` |
 
 Run from the `blender/` folder:
 ```
-Blender -b isometricroom.blend --factory-startup -P build_enriched_room.py
+Blender -b isometricroom.blend --factory-startup -P build_enriched_room.py   # only to regenerate
+Blender -b isometricroom_enriched.blend -P bake_ao.py
 Blender -b isometricroom_enriched.blend -P export_glb.py
 ```
+
+**Baking:** `bake_ao.py` applies the modifiers of the baked objects first: the floor planks, walls, rug, desk top, riser, dresser, shelves and window sill. The bake needs their final geometry. A few other props had their modifiers applied by an earlier version of the bake: the pouf, blanket, floor books, pinboard, wall print, curtain rod, plant pot, desk legs and window frame. They look the same, but their bevels are now real geometry instead of a modifier.
 
 ## Scale and axes
 - The `.blend` is authored in **centimetres**. The export scales the `StudyRoom` root node by 0.01, so the GLB is in **metres**. The room is about 2.70 × 2.22 × 2.79 m.

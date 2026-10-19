@@ -1,11 +1,16 @@
 import * as THREE from 'three/webgpu';
-import { float, mix, smoothstep, texture, time, uniform, uv, vec2, vec3, length } from 'three/tsl';
+import { abs, clamp, float, floor, fract, mix, sin, smoothstep, texture, time, uniform, uv, vec2, vec3, length, wgslFn } from 'three/tsl';
+import type { Node } from 'three/webgpu';
 import type { Room } from './room';
+import snowShader from '../shaders/snow/fragment.wgsl?raw';
 
 /**
  * The view outside the window, painted on `Window_Backdrop`: sky gradient, sun/moon,
  * drifting clouds, distant hills and rooftops with lit windows at night. The rain
  * shader refracts whatever is rendered here, so it needs real detail.
+ *
+ * Weather layers: rain streaks, and snowfall ported from Shadertoy Mdt3Df (WGSL, see
+ * src/shaders/snow/fragment.wgsl, plugged in with wgslFn).
  *
  * Masks are generated once into a DataTexture (R hills, G rooftops, B clouds, A lit windows).
  * In three.js the glTF UVs have v = 0 at the TOP, which matches canvas rows.
@@ -140,6 +145,8 @@ export interface OutsideInputs {
   day: number;      // 0 night … 1 day (eased)
   overcast: number; // 0 … 1 (eased)
   rain: number;     // 0 … 1 (eased)
+  /** 0 … 1 snowing (eased here) */
+  snow: number;
   /** lightning flash 0 … ~1 */
   flash?: number;
 }
@@ -158,6 +165,9 @@ export function createOutsideView(room: Room) {
     orbGlow: uniform(1),
     cloudAmount: uniform(0.3),
     windows: uniform(0),
+    rain: uniform(0),
+    snow: uniform(0),
+    flake: colorUniform(C('#ffffff')),
   };
 
   const st = uv();
@@ -176,6 +186,23 @@ export function createOutsideView(room: Room) {
   col = mix(col, vec3(u.roofs), m.g);
   col = mix(col, vec3(1.0, 0.78, 0.42), m.a.mul(m.g).mul(u.windows));
 
+  // rain streaks falling outside
+  const cols = float(150);
+  const rnd = fract(sin(floor(st.x.mul(cols)).mul(12.9898)).mul(43758.5453));
+  const fall = fract(st.y.mul(1.6).sub(time.mul(rnd.mul(0.6).add(1.3))).add(rnd.mul(13)));
+  const across = float(1).sub(smoothstep(0.0, 0.2, abs(fract(st.x.mul(cols)).sub(0.5))));
+  const streak = across.mul(float(1).sub(smoothstep(0.0, 0.14, fall))).mul(smoothstep(0.45, 0.55, rnd));
+  col = mix(col, vec3(u.horizon).mul(1.25), streak.mul(u.rain).mul(0.45));
+
+  // snowfall: WGSL port of Shadertoy Mdt3Df. Shadertoy's fragCoord starts bottom-left, so the
+  // glTF uv is flipped; 0.85 zooms in a little so the flakes read through the window
+  const snowfall = wgslFn(snowShader);
+  const iResolution = vec2(W, H);
+  const snowFragCoord = vec2(st.x, float(1).sub(st.y)).mul(iResolution).mul(0.85);
+  const snow = snowfall({ fragCoord: snowFragCoord, iTime: time, iResolution, amount: u.snow }) as unknown as Node<'vec4'>;
+  const flakes = clamp(snow.x.mul(1.8), 0, 1);
+  col = mix(col, vec3(u.flake), flakes.mul(u.snow));
+
   const material = new THREE.MeshBasicNodeMaterial();
   material.name = 'M_WindowSky_Outside';
   material.colorNode = col;
@@ -190,15 +217,22 @@ export function createOutsideView(room: Room) {
     return tmp;
   };
 
+  let snowEased = 0;
   return {
     update(i: OutsideInputs) {
       const elev = Math.sin((Math.PI * (i.hour - 6)) / 12);
       const dawn = (1 - smoothstepJS(0.0, 0.35, Math.abs(elev))) * Math.min(1, i.day * 2);
-      setColor(u.zenith, blend(P.zenith, i, dawn).multiplyScalar(1 + 2.5 * (i.flash ?? 0)));
-      setColor(u.horizon, blend(P.horizon, i, dawn).multiplyScalar(1 + 2 * (i.flash ?? 0)));
+      const snowDim = 1 - 0.3 * snowEased; // a heavier, darker sky so the flakes stand out
+      setColor(u.zenith, blend(P.zenith, i, dawn).multiplyScalar((1 + 2.5 * (i.flash ?? 0)) * snowDim));
+      setColor(u.horizon, blend(P.horizon, i, dawn).multiplyScalar((1 + 2 * (i.flash ?? 0)) * snowDim));
       setColor(u.cloud, blend(P.cloud, i, dawn));
-      setColor(u.hills, tmp.lerpColors(P.hills.night, P.hills.day, i.day).multiplyScalar(1 - 0.3 * i.overcast));
-      setColor(u.roofs, tmp.lerpColors(P.roofs.night, P.roofs.day, i.day).multiplyScalar(1 - 0.35 * i.overcast));
+      snowEased += (i.snow - snowEased) * 0.02;
+      u.snow.value = snowEased;
+      u.rain.value = i.rain;
+      const white = tmp2.set('#e8eef3').multiplyScalar(0.3 + 0.7 * i.day);
+      setColor(u.hills, tmp.lerpColors(P.hills.night, P.hills.day, i.day).multiplyScalar(1 - 0.3 * i.overcast).lerp(white, snowEased * 0.75));
+      setColor(u.roofs, tmp.lerpColors(P.roofs.night, P.roofs.day, i.day).multiplyScalar(1 - 0.35 * i.overcast).lerp(white, snowEased * 0.55));
+      setColor(u.flake, tmp.set('#9aa6c4').lerp(C('#ffffff'), i.day));
       u.cloudAmount.value = 0.3 + 0.7 * i.overcast;
       u.windows.value = 1 - i.day;
 

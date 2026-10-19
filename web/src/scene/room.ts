@@ -44,6 +44,12 @@ export class Room {
     return m;
   }
 
+  /** Swap a mesh's material and register it under its name (for lookups by other modules). */
+  setMaterial(meshName: string, material: THREE.Material): void {
+    this.node<THREE.Mesh>(meshName).material = material;
+    this.materials.set(material.name, material as THREE.MeshStandardMaterial);
+  }
+
   worldPosition(name: string, target = new THREE.Vector3()): THREE.Vector3 {
     return this.node(name).getWorldPosition(target);
   }

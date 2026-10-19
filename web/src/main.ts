@@ -7,6 +7,8 @@ import { Lighting } from './scene/lighting';
 import { createRainGlass } from './scene/rain';
 import { createOutsideView } from './scene/outside';
 import { createScreen } from './scene/screen';
+import { createAmbient } from './scene/ambient';
+import { applyBakedAO } from './scene/bakedAO';
 import { createMusic } from './inputs/music';
 import { Interactions } from './scene/interact';
 import { startWeather } from './inputs/weather';
@@ -18,8 +20,13 @@ import { currentHour, currentWeather, isAwake, registerMotion, soundLevel, state
 const VIEW_HEIGHT = 2.1; // metres visible vertically at zoom 1
 
 async function main() {
+  // the shaders are WGSL (wgslFn), so this needs real WebGPU — no WebGL2 fallback
+  const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown | null> } }).gpu;
+  if (!gpu || !(await gpu.requestAdapter())) {
+    throw new Error('this experiment needs WebGPU. Try a recent Chrome, Edge, Safari 26+ or Firefox 141+.');
+  }
   const renderer = new THREE.WebGPURenderer({ antialias: true });
-  await renderer.init(); // uses WebGPU, falls back to WebGL2 automatically
+  await renderer.init();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = THREE.AgXToneMapping;
@@ -37,6 +44,7 @@ async function main() {
   const progress = document.getElementById('loading-progress');
   const room = await Room.load(config.modelUrl, (f) => progress && (progress.style.width = `${Math.round(f * 100)}%`));
   scene.add(room.root);
+  await applyBakedAO(room, `${import.meta.env.BASE_URL}textures/room_ao.jpg`);
 
   // camera: orbit only around the open corner of the room
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -51,6 +59,7 @@ async function main() {
   controls.maxAzimuthAngle = -Math.PI * 0.56;
   controls.update();
 
+  const ambient = createAmbient(scene, room); // before Lighting: swaps in the twinkling string-light material
   const lighting = new Lighting(scene, room);
   const outside = createOutsideView(room);
   const glass = createRainGlass(room.node<THREE.Mesh>('Window_Glass'), { dom: renderer.domElement, camera, controls });
@@ -144,8 +153,9 @@ async function main() {
     lighting.flash = glass.flash;
     lighting.update(dt, now);
     const L = lighting.levels;
-    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain, flash: glass.flash });
+    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain, snow: w.condition === 'snow' ? 1 : 0, flash: glass.flash });
     monitor.update(dt, L.awake);
+    ambient.update(dt, camera, { sun: L.day * (1 - Math.max(L.cloud, L.rain)) });
     music.update(dt);
     // headphones sway on the stand with the music (Sound_Bump overrides this while it plays)
     swingT += dt;
@@ -153,7 +163,7 @@ async function main() {
     headphones.rotation.x += (swing - headphones.rotation.x) * Math.min(1, dt * 10);
     glass.update(dt, camera, {
       rain: w.rain,
-      fog: Math.min(1, w.rain * 1.6 + (w.condition === 'fog' ? 0.5 : 0)),
+      fog: Math.min(1, w.rain * 1.6 + (w.condition === 'fog' ? 0.5 : 0) + (w.condition === 'snow' ? 0.12 : 0)),
       storm: w.condition === 'storm',
     });
     room.update(dt);
