@@ -1,0 +1,18 @@
+# web
+web/node_modules/
+web/dist/
+web/.env.local
+web/.env.*.local
+
+# blender
+*.blend1
+*.blend2
+__pycache__/
+
+# firmware secrets
+firmware/**/secrets.h
+
+# os / editors
+.DS_Store
+.vscode/
+.idea/

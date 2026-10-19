@@ -1,0 +1,70 @@
+:root {
+  --ink: #3b3633;
+  --paper: #f6f1e7;
+  --accent: #c66f4e;
+  font-family: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--ink);
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #e9dfd3;
+}
+
+#app canvas {
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #e9dfd3;
+  transition: opacity 0.6s ease;
+  z-index: 10;
+}
+#loading.hidden { opacity: 0; pointer-events: none; }
+.loading-card { width: min(320px, 80vw); text-align: center; }
+.loading-title { margin: 0 0 12px; font-size: 15px; }
+.loading-bar { height: 6px; border-radius: 3px; background: rgba(59, 54, 51, 0.12); overflow: hidden; }
+.loading-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 44px;
+  transform: translate(-50%, 8px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+#credits {
+  position: fixed;
+  left: 12px;
+  bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(246, 241, 231, 0.75);
+  font-size: 11px;
+}
+#credits a { color: inherit; }
+
+.lil-gui.root { --background-color: rgba(246, 241, 231, 0.92); --text-color: #3b3633; --title-background-color: #e8dcc6;
+  --title-text-color: #3b3633; --widget-color: #e3d8c6; --hover-color: #d8ccb8; --focus-color: #cfc2ab;
+  --number-color: #8a5a3c; --string-color: #6f8a6e; }
+
+@media (prefers-reduced-motion: reduce) {
+  #toast, #loading { transition: none; }
+}

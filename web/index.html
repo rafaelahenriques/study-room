@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="An interactive isometric study room that reacts to live weather and motion." />
+    <title>Study Room</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="loading" role="status" aria-live="polite">
+      <div class="loading-card">
+        <p class="loading-title">Tidying up the room…</p>
+        <div class="loading-bar"><span id="loading-progress"></span></div>
+      </div>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <footer id="credits">
+      Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
