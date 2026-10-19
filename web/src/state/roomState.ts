@@ -7,6 +7,7 @@ import { config } from '../config';
 
 export type Mode = 'live' | 'manual';
 export type Condition = 'clear' | 'cloudy' | 'fog' | 'rain' | 'storm' | 'snow';
+export type ScreenApp = 'code' | 'weather';
 
 export interface WeatherLook {
   condition: Condition;
@@ -48,6 +49,8 @@ export const state = {
     sensorOnline: false,
   },
   sound: { mode: 'live' as Mode, manualLevel: 0, liveLevel: 0 },
+  screen: { app: 'auto' as 'auto' | ScreenApp },
+  music: { playing: false, title: '', artist: '', volume: 0.6, level: 0 },
 };
 
 /** Hour of day (0–24) at the room's location, or the manual hour. */
@@ -73,7 +76,7 @@ export function registerMotion(now = performance.now()): void {
 
 export function isAwake(now = performance.now()): boolean {
   const m = state.motion;
-  return m.keepAwake || m.sensorActive || now - m.lastMotion < config.inactivitySeconds * 1000;
+  return m.keepAwake || m.sensorActive || state.music.playing || now - m.lastMotion < config.inactivitySeconds * 1000;
 }
 
 export function soundLevel(): number {

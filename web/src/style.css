@@ -50,6 +50,35 @@ html, body {
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+#nowplaying {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 8px 8px 8px 8px;
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 5;
+}
+#nowplaying[hidden] { display: none; }
+.np-art { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #e3d6c1; flex: none; }
+.np-text { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
+.np-title { font-size: 13px; font-weight: 700; color: var(--ink); text-decoration: none;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.np-title:hover { text-decoration: underline; }
+.np-artist { font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.np-credit { font-size: 10px; opacity: 0.65; }
+.np-credit a { color: inherit; }
+.np-btn {
+  width: 32px; height: 32px; flex: none; border: 0; border-radius: 9px;
+  background: #e8dcc6; color: var(--ink); font-size: 14px; cursor: pointer;
+}
+.np-btn:hover, .np-btn:focus-visible { background: #d8ccb8; }
+
 #credits {
   position: fixed;
   left: 12px;

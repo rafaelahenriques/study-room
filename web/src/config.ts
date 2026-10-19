@@ -26,6 +26,14 @@ export const config = {
     offlineAfterSeconds: 30,
   },
 
+  music: {
+    /** Audius public API (no key needed). app_name identifies this site to Audius. */
+    api: 'https://api.audius.co',
+    appName: 'STUDY_ROOM',
+    genre: 'Lo-Fi',
+    volume: 0.6,
+  },
+
   /** Room goes back to sleep after this long without motion. */
   inactivitySeconds: 60,
   /** Sound level (0–1) that triggers the Sound_Bump reaction. */

@@ -23,10 +23,13 @@ webgl/
 │       ├── state/roomState.ts       single RoomState (manual > sensor > live weather)
 │       ├── scene/room.ts            GLB loading, node/material lookup, animation clips
 │       ├── scene/lighting.ts        sun, sky, lamp, screen, string lights from state
-│       ├── scene/rain.ts            TSL rain-on-glass material (placeholder to replace)
+│       ├── scene/rain.ts            TSL rain-on-glass shader (drops, trails, condensation, refraction)
+│       ├── scene/outside.ts         procedural view outside the window
+│       ├── scene/screen.ts          monitor desktop: code editor, weather, now-playing bar, screensaver
 │       ├── scene/interact.ts        hover + click via Blender's `interactive` tags
 │       ├── inputs/weather.ts        Open-Meteo polling
 │       ├── inputs/sensors.ts        MQTT (ESP32) – only active when configured
+│       ├── inputs/music.ts          lo-fi music from the Audius API (headphones)
 │       └── ui/panel.ts, ui/toast.ts manual controls + click captions
 ├── firmware/studyroom_sensor/    ESP32 sketch: PIR motion (+ optional mic) → MQTT
 └── NEXT_STEPS.md                 the build guide: what's left and how to do it
@@ -67,5 +70,7 @@ Flash `firmware/studyroom_sensor/studyroom_sensor.ino` to an ESP32. Before you d
 | 3D room, materials, animations, anchors | done |
 | Scene, camera, lighting by time/weather, motion wake/sleep, clickable objects, manual panel | working starter |
 | Live weather (Open-Meteo) | working |
-| Rain on glass | placeholder streaks; port the Shadertoy shader into `scene/rain.ts` |
+| Rain on glass | done (original TSL shader, refracts the outside view) |
+| Monitor screen | done (live canvas desktop: code + weather) |
+| Headphones music | done (Audius trending Lo-Fi, now-playing pill with credit) |
 | ESP32 motion + sound | firmware + web client written, not yet tested with hardware |

@@ -4,6 +4,8 @@ import { CONDITION_PRESETS, currentHour, state, type Condition } from '../state/
 export interface PanelActions {
   simulateMotion(): void;
   soundBump(): void;
+  toggleMusic(): void;
+  nextTrack(): void;
 }
 
 /**
@@ -45,6 +47,14 @@ export function createPanel(actions: PanelActions) {
   s.add(state.sound, 'manualLevel', 0, 1, 0.01).name('level')
     .onChange(() => (state.sound.mode = 'manual'));
   s.add(actions, 'soundBump').name('make a noise');
+
+  const sc = gui.addFolder('Computer screen');
+  sc.add(state.screen, 'app', ['auto', 'code', 'weather']).name('app').listen();
+
+  const mu = gui.addFolder('Music (headphones)');
+  mu.add(actions, 'toggleMusic').name('play / pause');
+  mu.add(actions, 'nextTrack').name('next track');
+  mu.add(state.music, 'volume', 0, 1, 0.01).name('volume');
 
   /** refresh read-only status lines (call a few times per second) */
   function refresh(awake: boolean) {

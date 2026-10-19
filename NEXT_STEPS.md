@@ -2,7 +2,7 @@
 
 The Blender side is done. `web/public/models/study_room.glb` has the geometry, materials, UVs, animations, interactive tags and light anchors. `blender/SCENE_NOTES.md` is the reference for every node name you'll use below.
 
-> **Already set up in `web/`:** steps 1–6 exist as a working starter, and step 8's web client and firmware (`firmware/studyroom_sensor/`) are written. Run it with `cd web && npm install && npm run dev`. The code snippets below explain how each part works. **What's left:** the real rain shader (step 7), connecting your broker and hardware (steps 8–9), and polish (step 10).
+> **Already set up in `web/`:** steps 1–6 exist as a working starter, and step 8's web client and firmware (`firmware/studyroom_sensor/`) are written. Run it with `cd web && npm install && npm run dev`. The code snippets below explain how each part works. **What's left:** connecting your broker and hardware (steps 8–9), and polish (step 10). The rain shader (step 7) is done.
 
 This guide covers the website itself: Three.js + TypeScript + WebGPURenderer, weather, the ESP32 sensors, the manual control panel and deployment. The order is chosen so you always have something working. **The manual controls come before the sensors**, so the site never depends on hardware being online.
 
@@ -212,40 +212,56 @@ Map the WMO `weather_code`:
 - **Polling:** check every 10–15 minutes.
 - **Night:** use `is_day` together with the local hour to decide when night begins. At night the lamp, screen and string lights carry the scene.
 
-## 7. The rain-on-glass shader in TSL (3–5 days, the main technical piece)
+## 7. The rain-on-glass shader in TSL ✅ done
 
-**Source:** "Heartfelt" by Martijn Steinrucken (BigWings) on Shadertoy is the classic one. **Check the licence on its page.** Shadertoy shaders default to *CC BY-NC-SA 3.0*: credit the author on the site, no commercial use, and share-alike for your port. If the site might ever be commercial, ask the author or write your own drop function.
+`web/src/scene/rain.ts` is an **original** TSL shader. Because no Shadertoy code is copied, none of Shadertoy's non-commercial licence terms apply to your site. Here's how it works:
 
-**Porting approach:**
-1. Get the GLSL running unchanged first, on a plane with `ShaderMaterial` (WebGL), so you have a visual reference.
-2. Port it function by function to TSL with `Fn(() => { ... })`. The mappings: `fract`, `smoothstep`, `mix`, `sin` → same names in TSL; `iTime` → `time`; `fragCoord/iResolution` → `uv()`; `texture(iChannel0, uv, lod)` → `texture(tex, uv).level(lod)`; `vec2(...)` → `vec2(...)`.
-3. Use the glass's own 0–1 UVs. They're already set up on `Window_Glass`, with v pointing up so the drops fall the right way.
+| Layer | What it does |
+|---|---|
+| Sliding drops (2 grids) | Each cell holds one drop that sticks, then slides down with a slight wobble. Its fade-in/out hides the loop restarting. |
+| Trails | Small beads are left behind each sliding drop, and a wet path wipes away the condensation. |
+| Static beads | Tiny droplets land, sit and evaporate. |
+| Condensation | The view behind the glass is blurred by sampling a lower mip level, except inside drops and trails. |
+| Refraction | Each drop works like a small lens on the real rendered scene behind the glass, via `viewportMipTexture`. The drop offsets are mapped to the screen from the glass corners every frame, so refraction stays correct when the camera orbits or zooms. |
 
-```ts
-import * as THREE from 'three/webgpu';
-import { Fn, uv, time, uniform, texture, vec2, vec3, mix } from 'three/tsl';
+`web/src/scene/outside.ts` paints the view the drops refract:
+- a sky gradient with the sun, or the moon at night
+- drifting clouds
+- hills and rooftops, with lit house windows at night
 
-export const rainAmount = uniform(0);          // fed from state.rain (eased)
-export function makeGlassMaterial(sky: THREE.Texture) {
-  const m = new THREE.MeshBasicNodeMaterial({ transparent: true });
-  m.colorNode = Fn(() => {
-    const st = uv();
-    const drops = rainLayers(st, time, rainAmount);   // your port: returns vec3(offset.xy, focus)
-    const blur = mix(6.0, 0.0, drops.z);               // blurry glass, sharp inside drops
-    return texture(sky, st.add(drops.xy)).level(blur).rgb;
-  })();
-  m.opacityNode = mix(0.15, 0.85, rainAmount);
-  return m;
-}
-const glass = room.getObjectByName('Window_Glass') as THREE.Mesh;
-glass.material = makeGlassMaterial(skyTexture);
-```
+Everything is driven by the time of day and the weather.
 
-**The view behind the drops:** the shader needs something to distort. Pick one:
-- **Option A (easiest):** use a photo or painted texture of the view outside, swap it by day and night, and hide `Window_Backdrop`.
-- **Option B:** each frame, render `Window_Backdrop` plus a sky gradient to a small `RenderTarget`, and sample that.
+**Tuning knobs:**
+- **Number of drops:** the `rain` uniform (0–1). The grids pick drops with `step(hash, amount)`.
+- **Condensation:** `fog` (in `main.ts`: `rain × 0.6`, plus `0.5` when foggy).
+- **Storms:** `speed` is 1.5 during a storm.
+- **Drop size:** `r` in `slidingDrops()` and `staticBeads()`.
+- **Grid density:** the `(cols, rows)` and `cells` arguments.
+- **Lens strength:** the `-2.6 / cols` and `-2.0 / cells` factors.
+- **Blur strength:** `mist × 5.0` (the mip level).
 
-**Keep it light:** limit the drop layers to 2–3 on mobile, and set `rainAmount = 0` to skip the expensive work when it's dry.
+The glass UVs in Three.js have `v = 0` at the **top** (glTF flips V), so the shader uses `st = (u, 1 − v)`.
+
+**Performance:** it ran at 120 fps (the display's limit) on WebGPU at 2× pixel density in a full storm. On slow phones, lower `cells` or drop the second sliding layer.
+
+### The monitor screen ✅ done
+
+`web/src/scene/screen.ts` draws a small "desktop" on a canvas and uses it as the screen texture, redrawn 15 times a second:
+- **Code:** a code editor that types out the rain shader.
+- **Weather:** the live conditions.
+
+When the room is awake, the two apps alternate every 22 seconds. Clicking the monitor switches app, and the panel can pin one under **Computer screen**. While music plays, the top bar shows the current track. When the room is asleep, the screen shows a dim screensaver clock.
+
+### Music on the headphones ✅ done
+
+`web/src/inputs/music.ts` streams lo-fi music from the **Audius** public API (https://docs.audius.org). It needs no API key; `app_name` identifies the site.
+
+- **Clicking the headphones** plays or pauses. A pill in the bottom-right shows the artwork, title and artist, links to the track on Audius, and has next/stop buttons. That credit is how artists get attribution, so keep it visible.
+- **Tracks** come from the trending **Lo-Fi** chart for the month, shuffled. Unplayable tracks are skipped. To change it, edit `config.music.genre` (for example `'Ambient'`).
+- **Loudness:** Audius streams allow cross-origin access, so the audio goes through a WebAudio `AnalyserNode`, and `state.music.level` (0–1) follows the music's loudness. The headphones sway on the stand with it. You can use the same value to make other things pulse, such as the plant or the string lights.
+- **Sound sensor:** music doesn't trigger the `Sound_Bump` reaction. Only the sound sensor or the manual sound slider does.
+- **Awake:** the room stays awake while music plays.
+- **Browser rule:** audio can only start from a click, which is why playback begins on the headphones.
 
 ## 8. ESP32 motion sensor (2–3 days, including hardware)
 
@@ -333,7 +349,7 @@ Show `sensorsOnline` in the panel, for example "Sensor: live" versus "Sensor: of
 |---|---|
 | 1 | Steps 1–3: room loads, camera feels good, manual panel switches day/night and lamp on/off |
 | 2 | Steps 4–6: lighting moods for each weather, clickable objects, live weather |
-| 3 | Step 7: rain on glass |
+| 3 | Step 7: rain on glass ✅ |
 | 4 | Steps 8–9: ESP32 motion (+ sound), sensor status in the UI |
 | 5 | Step 10: optimise, test on phones, deploy |
 

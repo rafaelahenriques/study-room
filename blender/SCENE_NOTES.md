@@ -22,13 +22,13 @@ Blender -b isometricroom_enriched.blend -P export_glb.py
 
 ## Interactive and independently accessible nodes
 Nodes with `userData.interactive` (glTF extras):
-`Lamp` (lamp), `Lamp_Switch` (lamp_switch), `Monitor_Screen` (monitor), `Window_Glass` (window), `Headphones`, `CameraProp` (camera), `Clock_Body` (clock), `Mug`, `Calendar_Stand` (calendar), `DeskPlant` / `FloorPlant` (plant), `Chair`, `Drawer_1`–`Drawer_3` (drawer), `Easel` / `Easel_Painting` (easel).
+`Lamp` (lamp), `Lamp_Switch` (lamp_switch), `Monitor_Screen` (monitor), `Window_Glass` (window), `Headphones` (headphones: plays music), `CameraProp` (camera), `Clock_Body` (clock), `Mug`, `Calendar_Stand` (calendar), `DeskPlant` / `FloorPlant` (plant), `Chair`, `Drawer_1`–`Drawer_3` (drawer), `Easel` / `Easel_Painting` (easel).
 
 | Feature | Nodes | Notes |
 |---|---|---|
-| Rain on glass | `Window_Glass` | One quad with 0–1 UVs, v pointing up. Replace `M_WindowGlass` with the TSL rain material. |
-| Sky behind the window | `Window_Backdrop` | Emissive quad with 0–1 UVs, 12 cm outside the wall. Drive its colour/texture by time of day, or hide it if the glass shader samples its own background. |
-| Monitor wake | `Monitor_Screen` | Separate quad with 0–1 UVs (u to the right as seen by the viewer). `M_Screen` is emissive; animate `emissiveIntensity` or swap in a canvas/video texture. |
+| Rain on glass | `Window_Glass` | One quad with 0–1 UVs. In Blender v points up; in Three.js (glTF) v = 0 is at the **top**. `web/src/scene/rain.ts` replaces `M_WindowGlass` with the TSL rain material. |
+| Sky behind the window | `Window_Backdrop` | Quad with 0–1 UVs, 12 cm outside the wall. `web/src/scene/outside.ts` paints the outside view on it (sky, sun/moon, clouds, hills, rooftops), and the rain shader refracts it. |
+| Monitor screen | `Monitor_Screen` | Separate quad with 0–1 UVs (u runs to the viewer's right; in Three.js v = 0 is at the top). `web/src/scene/screen.ts` replaces `M_Screen` with a live canvas texture. |
 | Desk lamp | `Lamp` → `Lamp_Base` → `Lamp_ArmLower` → `Lamp_ArmUpper` → `Lamp_Head` → `Lamp_Bulb` | `M_LampBulb` is emissive. Put a SpotLight at `Anchor_LampLight` aimed at `Anchor_LampTarget`. Both are children of `Lamp_Head`, so they follow the animation. |
 | Night ambience | `StringLights_Bulbs` | One mesh using `M_StringLightBulb` (emissive). The bulbs hang on hooks about 5 cm off the wall. Fade them in at night. |
 | Clock | `Clock_HandHour`, `Clock_HandMinute` | Set `rotation.z` to the clockwise angle in radians (0 = 12 o'clock). The default is 10:10. |

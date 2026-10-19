@@ -16,7 +16,6 @@ const PALETTE = {
   skyDay: C('#e8eef5'), skyNight: C('#56618f'), skyGrey: C('#c3c7cd'),
   groundDay: C('#8a6a4a'), groundNight: C('#3a2a20'),
   bgDay: C('#e9dfd3'), bgNight: C('#232838'), bgGrey: C('#cfcfcf'),
-  windowDay: C('#bcd8ec'), windowDawn: C('#f2b48c'), windowNight: C('#1b2440'), windowGrey: C('#aeb6bf'),
 };
 
 /**
@@ -37,7 +36,6 @@ export class Lighting {
   private readonly sunTarget = new THREE.Vector3();
   private readonly sunBase = new THREE.Vector3();
   private readonly tmp = new THREE.Vector3();
-  private readonly tmpColor = new THREE.Color();
   private readonly mats;
 
   constructor(private readonly scene: THREE.Scene, private readonly room: Room) {
@@ -58,10 +56,8 @@ export class Lighting {
     room.worldPosition('Anchor_CameraTarget', this.nightFill.position).add(new THREE.Vector3(0.3, 1.0, 0.2));
 
     this.mats = {
-      screen: room.material('M_Screen'),
       bulb: room.material('M_LampBulb'),
       fairy: room.material('M_StringLightBulb'),
-      sky: room.material('M_WindowSky'),
     };
     this.mats.bulb.emissiveIntensity = 0;
   }
@@ -94,16 +90,9 @@ export class Lighting {
     this.hemi.groundColor.lerpColors(PALETTE.groundNight, PALETTE.groundDay, day);
     this.hemi.intensity = 0.7 + 0.7 * day * (1 - 0.25 * overcast);
 
-    // background + view outside the window
+    // page background (the view outside the window lives in outside.ts)
     const bg = this.scene.background as THREE.Color | null;
     if (bg?.isColor) bg.lerpColors(PALETTE.bgNight, PALETTE.bgDay, day).lerp(PALETTE.bgGrey, overcast * 0.35 * day);
-    const dawn = 1 - smoothstep(0.0, 0.35, Math.abs(elev));
-    this.tmpColor.lerpColors(PALETTE.windowNight, PALETTE.windowDay, day)
-      .lerp(PALETTE.windowDawn, dawn * day * (1 - overcast))
-      .lerp(PALETTE.windowGrey, overcast * day * 0.8);
-    this.mats.sky.color.copy(this.tmpColor);
-    this.mats.sky.emissive.copy(this.tmpColor);
-    this.mats.sky.emissiveIntensity = 0.35 + 0.8 * day;
 
     // desk lamp follows the animated head
     this.room.worldPosition('Anchor_LampLight', this.lamp.position);
@@ -111,8 +100,7 @@ export class Lighting {
     this.lamp.intensity = 6 * L.awake;
     this.mats.bulb.emissiveIntensity = 3 * L.awake;
 
-    // monitor wakes with motion
-    this.mats.screen.emissiveIntensity = 0.15 + 2.5 * L.awake;
+    // monitor glow (the screen picture itself is drawn by screen.ts)
     this.screenGlow.intensity = 0.6 * L.awake;
 
     // string lights at night (and a little on dark rainy days)

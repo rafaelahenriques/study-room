@@ -5,6 +5,9 @@ import { config } from './config';
 import { Room } from './scene/room';
 import { Lighting } from './scene/lighting';
 import { createRainGlass } from './scene/rain';
+import { createOutsideView } from './scene/outside';
+import { createScreen } from './scene/screen';
+import { createMusic } from './inputs/music';
 import { Interactions } from './scene/interact';
 import { startWeather } from './inputs/weather';
 import { startSensors } from './inputs/sensors';
@@ -49,8 +52,12 @@ async function main() {
   controls.update();
 
   const lighting = new Lighting(scene, room);
-  const glass = createRainGlass();
-  room.node<THREE.Mesh>('Window_Glass').material = glass.material;
+  const outside = createOutsideView(room);
+  const glass = createRainGlass(room.node<THREE.Mesh>('Window_Glass'));
+  const monitor = createScreen(room);
+  const music = createMusic();
+  const headphones = room.node('Headphones');
+  let swingT = 0;
 
   room.loop('Plant_Sway');
   room.loop('Chair_Swivel', 0.6);
@@ -70,6 +77,8 @@ async function main() {
   const panel = createPanel({
     simulateMotion: () => registerMotion(),
     soundBump,
+    toggleMusic: () => void music.toggle(),
+    nextTrack: () => music.next(),
   });
 
   new Interactions(camera, renderer.domElement, room, (kind, obj) => {
@@ -85,11 +94,11 @@ async function main() {
         break;
       case 'headphones':
         soundBump();
-        toast('♪ lo-fi beats to study to');
+        void music.toggle().then((on) => toast(on ? `♪ ${state.music.title} — ${state.music.artist}` : 'Music off'));
         break;
       case 'monitor':
         registerMotion();
-        toast('Screen wakes up');
+        monitor.next();
         break;
       case 'window': {
         const w = currentWeather();
@@ -112,7 +121,7 @@ async function main() {
   document.getElementById('loading')?.classList.add('hidden');
 
   const timer = new THREE.Timer();
-  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls } });
+  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music } });
   let prevAwake = false;
   let statusTimer = 0;
   renderer.setAnimationLoop(() => {
@@ -128,7 +137,6 @@ async function main() {
     if (soundLevel() > config.soundBumpThreshold) soundBump();
 
     const w = currentWeather();
-    glass.update(dt, w.rain);
     curtains.timeScale = w.condition === 'storm' ? 1.6 : 0.8;
 
     const h = currentHour();
@@ -136,6 +144,20 @@ async function main() {
     hourHand.rotation.z = (((h % 12) / 12) * Math.PI * 2);
 
     lighting.update(dt, now);
+    const L = lighting.levels;
+    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain });
+    monitor.update(dt, L.awake);
+    music.update(dt);
+    // headphones sway on the stand with the music (Sound_Bump overrides this while it plays)
+    swingT += dt;
+    const swing = state.music.playing ? Math.sin(swingT * 6.5) * 0.08 * state.music.level : 0;
+    headphones.rotation.x += (swing - headphones.rotation.x) * Math.min(1, dt * 10);
+    glass.update(dt, camera, {
+      rain: w.rain,
+      fog: Math.min(1, w.rain * 0.6 + (w.condition === 'fog' ? 0.5 : 0)),
+      storm: w.condition === 'storm',
+      day: L.day,
+    });
     room.update(dt);
     controls.update();
     renderer.render(scene, camera);
