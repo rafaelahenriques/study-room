@@ -25,10 +25,15 @@ async function main() {
   // the shaders are WGSL (wgslFn), so this needs real WebGPU — no WebGL2 fallback
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown | null> } }).gpu;
   if (!gpu || !(await gpu.requestAdapter())) {
-    throw new Error('this experiment needs WebGPU. Try a recent Chrome, Edge, Safari 26+ or Firefox 141+.');
+    throw new Error('this experiment needs WebGPU. Try a recent Chrome or Edge, Safari 26+, or Firefox 141+ on Windows.');
   }
   const renderer = new THREE.WebGPURenderer({ antialias: true });
   await renderer.init();
+  // init() quietly switches to the WebGL2 backend if the GPU device can't be created,
+  // and the WGSL ports would then fail to compile: say so instead of showing a broken room
+  if (!(renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend) {
+    throw new Error('WebGPU could not start on this device (the browser fell back to WebGL). Try a recent Chrome or Edge.');
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = THREE.AgXToneMapping;
@@ -110,10 +115,14 @@ async function main() {
   for (const n of ['Shelf_1', 'Shelf_2', 'Shelf_3']) room.node(n).userData.interactive = 'shelf';
   room.root.traverse((o) => { if (/^Shelf_\d_Book_\d+$/.test(o.name)) o.userData.interactive = 'shelf'; });
 
+  const toggleMusic = () => void music.toggle().then((r) => toast(
+    r === 'playing' ? `♪ ${state.music.title} — ${state.music.artist}`
+      : r === 'paused' ? 'Music off' : 'Music unavailable right now (Audius could not be reached)'));
+
   const panel = createPanel({
     simulateMotion: () => registerMotion(),
     soundBump,
-    toggleMusic: () => void music.toggle(),
+    toggleMusic,
     nextTrack: () => music.next(),
     searchCity: (name) => void searchCity(name).then((n) => toast(`Weather for ${n}`)).catch((e) => toast(`City not found: ${e.message}`)),
     useMyLocation: () => void useDeviceLocation().then(() => toast('Weather for your location')).catch((e) => toast(`Location unavailable: ${e.message}`)),
@@ -135,7 +144,7 @@ async function main() {
         break;
       case 'headphones':
         soundBump();
-        void music.toggle().then((on) => toast(on ? `♪ ${state.music.title} — ${state.music.artist}` : 'Music off'));
+        toggleMusic();
         break;
       case 'monitor':
         registerMotion();
@@ -175,6 +184,8 @@ async function main() {
   void startSensors();
 
   document.getElementById('loading')?.classList.add('hidden');
+  // the shader interaction is the heart of the piece, but the window is small: point it out once
+  toast('Tip: hold and drag on the window to change the rain', 7000);
 
   const timer = new THREE.Timer();
   if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, get physics() { return physics; } } });

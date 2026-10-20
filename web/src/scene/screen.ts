@@ -4,7 +4,7 @@ import { currentHour, currentWeather, state, type Condition, type ScreenApp } fr
 
 /**
  * The monitor's "desktop", drawn on a canvas and used as the screen texture.
- * Apps: code editor (types out the rain shader) and weather; the top bar shows the
+ * Apps: code editor (types out the window's Heartfelt WGSL) and weather; the top bar shows the
  * track playing on the headphones. Asleep → dim screensaver.
  *
  * Monitor_Screen UVs in three.js: u → viewer's right, v = 0 at the top,
@@ -25,24 +25,26 @@ const TERRA = '#c66f4e';
 const MUSTARD = '#d9a441';
 const BLUE = '#6c8ea8';
 
-const CODE = `// rain on glass — sliding drops (TSL)
-function slidingDrops(st, t, cols, rows, amount, seed) {
-  const g = st.mul(vec2(cols, rows)).add(vec2(0, t.mul(0.12)));
-  const id = floor(g).add(seed);
-  const f = fract(g).sub(0.5);
-  const n = hash22(id);
-  const on = step(hash12(id.add(5.31)), amount);
+const CODE = `// heartfelt.wgsl — rain on this window (Heartfelt, BigWings)
+fn heartfelt(fragCoord: vec2f, iTime: f32, iMouse: vec4f, ...) -> vec4f {
+  var uv = (fragCoord - 0.5 * iResolution) / iResolution.y;
+  let M = vec3f(iMouse.xy / iResolution, iMouse.z);
+  let T = iTime + M.x * 2.0;
 
-  // stick … then slide
-  const phase = fract(t.mul(n.y.mul(0.25).add(0.12)).add(n.x));
-  const py = float(0.38).sub(smoothstep(0.5, 0.95, phase).mul(0.76));
-  const p = vec2(f.x.sub(px), f.y.sub(py).mul(cols / rows));
-  const drop = inside(r.mul(0.7), r, length(p)).mul(fade);
+  // drag on the glass = Shadertoy's iMouse
+  let rainAmount = select(weatherRain, M.y, iMouse.z > 0.0);
 
-  return { off: p.mul(drop).mul(-2.6 / cols), cov: drop };
+  let c = Drops(uv, T * 0.2, staticDrops, layer1, layer2);
+  let n = vec2f(cx - c.x, cy - c.x);   // drop normals
+
+  let focus = mix(maxBlur - c.y, minBlur, S(0.1, 0.2, c.x));
+  let sampleUV = screenUV + screenU * n.x + screenV * n.y;
+  var col = textureSampleLevel(iChannel0, iChannel0Sampler,
+                               sampleUV, focus * fog).rgb;
+  return vec4f(col, 1.0);
 }`;
 
-const KEYWORDS = /\b(const|function|return|let|import|from|export)\b/g;
+const KEYWORDS = /\b(fn|let|var|return|select|vec2f|vec3f|vec4f|f32)\b/g;
 
 export function createScreen(room: Room) {
   const canvas = document.createElement('canvas');
@@ -140,7 +142,7 @@ export function createScreen(room: Room) {
 
   function codeApp(dt: number) {
     const x = 70, y = 62, w = W - 140, h = H - 110;
-    windowFrame('rain.ts — study-room', x, y, w, h, true);
+    windowFrame('heartfelt.wgsl — study-room', x, y, w, h, true);
     typed = Math.min(CODE.length + 120, typed + dt * 38);
     if (typed >= CODE.length + 120) typed = 0;   // pause, then start over
     const text = CODE.slice(0, Math.floor(typed));
@@ -172,7 +174,7 @@ export function createScreen(room: Room) {
     }
     // simple tokenizer: keywords, numbers, everything else
     let cursor = x;
-    const parts = line.split(/(\b(?:const|function|return|let|import|from|export)\b|\d+\.?\d*)/g);
+    const parts = line.split(/(\b(?:fn|let|var|return|select|vec2f|vec3f|vec4f|f32)\b|\d+\.?\d*)/g);
     for (const part of parts) {
       if (!part) continue;
       ctx.fillStyle = KEYWORDS.test(part) ? TERRA : /^\d/.test(part) ? MUSTARD : /[{}()[\]]/.test(part) ? '#d8ccb8' : '#e9e1d4';

@@ -43,7 +43,7 @@ export function createMusic() {
     title: document.querySelector<HTMLAnchorElement>('#nowplaying .np-title')!,
     artist: document.querySelector<HTMLElement>('#nowplaying .np-artist')!,
   };
-  document.querySelector('#nowplaying .np-next')!.addEventListener('click', () => void next());
+  document.querySelector('#nowplaying .np-next')!.addEventListener('click', () => nextOrStop());
   document.querySelector('#nowplaying .np-stop')!.addEventListener('click', () => pause());
 
   let queue: Track[] = [];
@@ -99,17 +99,19 @@ export function createMusic() {
     await audio.play();
   }
 
-  async function next() {
-    if (!queue.length) return;
+  async function next(): Promise<void> {
+    if (!queue.length) throw new Error('no playable tracks');
     try {
       await playIndex((index + 1) % queue.length);
     } catch {
-      // unplayable track: skip it
+      // unplayable track: skip it (and give up once none are left)
       queue.splice(index, 1);
       index -= 1;
-      if (queue.length) await next();
+      await next();
     }
   }
+  /** for event handlers: stop quietly when nothing can be played */
+  const nextOrStop = () => void next().catch(() => pause());
 
   async function play() {
     ensureAudioGraph();
@@ -132,27 +134,28 @@ export function createMusic() {
     ui.root.hidden = true;
   }
 
-  audio.addEventListener('ended', () => void next());
+  audio.addEventListener('ended', nextOrStop);
   audio.addEventListener('error', () => {
-    if (state.music.playing) void next();
+    if (state.music.playing) nextOrStop();
   });
 
   return {
-    async toggle(): Promise<boolean> {
+    /** 'unavailable' when Audius can't be reached or no track plays */
+    async toggle(): Promise<'playing' | 'paused' | 'unavailable'> {
       if (state.music.playing) {
         pause();
-        return false;
+        return 'paused';
       }
       try {
         await play();
-        return true;
+        return 'playing';
       } catch (err) {
         console.warn('Music unavailable:', err);
         pause();
-        return false;
+        return 'unavailable';
       }
     },
-    next: () => void next(),
+    next: () => nextOrStop(),
 
     update(dt: number) {
       // fade volume in/out, pause the element once silent

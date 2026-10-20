@@ -7,8 +7,7 @@ Safe to run more than once (it skips what already exists).
 
 Then re-run bake_ao.py and export_glb.py.
 
-  - PaperBin  : waste-paper bin on the floor, on the far side of the room (diagonally opposite
-                the easel, between the dresser and the floor plant)
+  - PaperBin  : waste-paper bin on the floor at BIN_AT (re-running the script keeps it there)
   - Notepad   : a pad of paper on the monitor riser — click it on the website to toss a paper ball
   - books     : each shelf's merged book mesh (Shelf_N_Books) is split into one object per book
                 (Shelf_N_Book_01 …) with its origin at its centre, so every book can be a physics body
@@ -21,7 +20,7 @@ S = C.scene
 root = D.objects["StudyRoom"]
 props = D.collections["Props_Floor"]
 FLOOR_TOP = 4.2  # top of the floor planks (cm)
-BIN_AT = (62.0, 106.0, FLOOR_TOP)
+BIN_AT = (-71.2, 102.5, FLOOR_TOP)  # where the bin sits in the enriched file (moved by hand in Blender)
 
 
 def mat(name):

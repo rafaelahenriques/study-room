@@ -2,6 +2,8 @@
 
 An interactive isometric study room for the web. It reacts to live weather, a motion sensor and (optionally) sound, and has a manual control panel that works without any hardware.
 
+**Live site:** https://studywebgl.netlify.app/ (needs a WebGPU browser: recent Chrome or Edge, Safari 26+, Firefox 141+ on Windows)
+
 ![Room, awake](blender/previews/room_awake.png)
 
 ## Original shaders
@@ -54,7 +56,7 @@ webgl/
 │   └── src/
 │       ├── main.ts                  renderer, camera, loop, click handling
 │       ├── config.ts                location, MQTT, timings
-│       ├── state/roomState.ts       single RoomState (manual > sensor > live weather)
+│       ├── state/roomState.ts       single RoomState: each input is live or manual (see Inputs)
 │       ├── scene/room.ts            GLB loading, node/material lookup, animation clips
 │       ├── scene/lighting.ts        sun, sky, lamp, screen, string lights from state
 │       ├── shaders/heartfelt/fragment.wgsl  WGSL port of Heartfelt (rain on the glass)
@@ -82,7 +84,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The site needs **WebGPU**: recent Chrome or Edge, Safari 26+, or Firefox 141+. The shaders are WGSL, so there's no WebGL fallback. Browsers without WebGPU get a message instead.
+Open http://localhost:5173. The site needs **WebGPU**: recent Chrome or Edge, Safari 26+, or Firefox 141+ on Windows. The shaders are WGSL, so there's no WebGL fallback: browsers without WebGPU, or where three.js would fall back to WebGL2, get a message instead.
 
 - **Configuration (optional):** copy `web/.env.example` to `web/.env.local` and set the weather location and the MQTT broker. Without it, the site uses Lisbon's weather and the manual panel.
 - **Production build:** `npm run build` writes `web/dist/`. Upload that folder to any static host (Vercel, Netlify, GitHub Pages).
@@ -110,15 +112,30 @@ The bake takes about a minute on the GPU. The export writes straight into `web/p
 | **Notepad** on the monitor riser | Crumples a paper ball and throws it at the bin across the room (physics). Each basket shows "Score!". |
 | **Shelf or book** | Knocks that shelf's books off (physics). Panel → Physics → *tidy the books* puts them back. A very loud sound from the sound sensor knocks them over too. |
 | **Chair** | Spins once on its swivel. |
-| **Window** (hold and drag) | Heartfelt's `iMouse`: up and down = amount of rain, left and right = drop time. |
+| **Window** (hold and drag) | Heartfelt's `iMouse`: up and down = amount of rain while you hold, left and right = drop time (stays where you leave it). On release the rain goes back to the weather, as on Shadertoy. |
 | **Lamp, monitor, headphones, drawers** | Lamp on or off, switch screen app, lo-fi music (Audius), open or close the drawers. |
 | Panel → **Location** | Search a city, or *use my location*. By default the weather and room clock follow the city of your browser's time zone. |
+
+## Inputs
+
+Every input writes into `state` ([`roomState.ts`](web/src/state/roomState.ts)); the scene only reads it. Each property has its own sources:
+
+| Property | Live source | Manual | Back to live |
+|---|---|---|---|
+| Time of day | the location's clock (Open-Meteo UTC offset), else this device's clock | panel hour slider | *source → live* or *back to live* |
+| Weather | Open-Meteo, every 15 min. If it fails, the room shows the manual values and the panel says so | panel condition / rain / clouds | same |
+| Sound level | ESP32 microphone over MQTT. 0 when no sensor is connected | panel level slider | same |
+| Room awake | any of: motion in the last 60 s (sensor, *simulate motion*, clicking the monitor, starting music), sensor reporting motion, music playing, *keep room awake* / lamp | — | *back to live* clears *keep room awake* |
+
+**Stale sensor data:** without any MQTT message for 30 s, the sensor counts as offline: motion and sound fall back to inactive and 0. Without `VITE_MQTT_URL` the sensor code doesn't load at all.
+
+The panel's **Now** folder shows what the room is actually using and where it comes from.
 
 **Physics** uses [Rapier](https://rapier.rs) (`@dimforge/rapier3d-compat`), loaded in the background after the room appears:
 - **Static scene:** triangle meshes of the room and furniture, built from the GLB.
 - **Books:** each book is a convex-hull body. It stays fixed until it's knocked over, then becomes dynamic.
 - **Paper balls:** spheres with continuous collision detection (CCD), so the fast balls don't pass through the bin wall.
-- **When nothing moves,** the simulation is skipped.
+- **Stepping:** a fixed 1/60 s step, and only while a book is moving or a paper ball is in the room (at most 10 balls).
 
 **Location privacy:**
 - **By default,** only the time-zone city name goes to the Open-Meteo geocoding API, with no permission prompt.
@@ -128,7 +145,7 @@ The bake takes about a minute on the GPU. The export writes straight into `web/p
 
 Ambient occlusion (the soft contact shadows under furniture, in the corners and behind the shelves) is baked in Blender with Cycles, by [`blender/bake_ao.py`](blender/bake_ao.py), into one 2048² atlas: `web/public/textures/room_ao.jpg`.
 
-- **UV map:** each baked object gets a second UV map, `AO_UV`, laid out by hand. The floor, walls, rug and furniture tops are each projected flat into their own region of the atlas. It's exported as glTF `TEXCOORD_1`, which Three.js reads as `uv1`.
+- **UV map:** each baked object (13 static meshes: floor, walls, rug, desk top, dresser, riser, shelves, sill) gets a second UV map, `AO_UV`, laid out by hand. The floor, walls, rug and furniture tops are each projected flat into their own region of the atlas. It's exported as glTF `TEXCOORD_1`, which Three.js reads as `uv1`.
 - **In Three.js** ([`web/src/scene/bakedAO.ts`](web/src/scene/bakedAO.ts)): the atlas becomes the `aoMap` on UV channel 1, with `flipY = false`, the same as the course's `baked.jpg`.
 - **Why only AO:** the course bakes *all* the lighting into one texture shown with an unlit `MeshBasicMaterial`. Here only the occlusion is baked, because the lighting has to stay real-time: it changes with the time of day, the weather, the motion sensor and the desk lamp.
 - **What's baked:** only objects that never move. Baked shadows would be wrong on the lamp, drawers, chair, curtains or headphones once they animate.
@@ -154,7 +171,7 @@ Flash `firmware/studyroom_sensor/studyroom_sensor.ino` to an ESP32. Before you d
 | 3D room, materials, animations, anchors | done |
 | Scene, camera, lighting by time/weather, motion wake/sleep, clickable objects, manual panel | working starter |
 | Live weather (Open-Meteo) | working |
-| Rain on glass | done (WGSL port of Heartfelt via wgslFn, refracts the outside view, drag = iMouse) |
+| Rain on glass | done (WGSL port of Heartfelt via wgslFn, refracts what is rendered behind the glass, drag = iMouse) |
 | Snow outside | done (WGSL port of Mdt3Df via wgslFn, shown when it snows) |
 | Baked ambient occlusion | done (Cycles bake, aoMap on uv1) |
 | Physics | done (Rapier: paper toss into the bin, books knocked off the shelves) |
