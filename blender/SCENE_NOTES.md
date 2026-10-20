@@ -38,6 +38,7 @@ Nodes with `userData.interactive` (glTF extras):
 | Clock | `Clock_HandHour`, `Clock_HandMinute` | Set `rotation.z` to the clockwise angle in radians (0 = 12 o'clock). The default is 10:10. |
 | Mug steam | `Anchor_MugSteam` | Rim centre, for a particle or sprite effect. |
 | Screen glow | `Anchor_ScreenLight` | In front of the screen centre, for a RectAreaLight or PointLight. |
+| Physics props | `PaperBin` (floor, far side of the room), `Notepad` (monitor riser), `Shelf_1_Book_01` … `Shelf_3_Book_06` (one node per book, origin at its centre) | Added by `add_props.py`. The website turns the books into Rapier bodies and throws paper from the notepad into the bin. |
 | Drawers | `Dresser` → `Drawer_1` (top) … `Drawer_3` | Each drawer is its own node with a real drawer box inside. The drawers slide toward the room. |
 | Easel painting | `Easel_Painting` | Its first face is a 0–1 UV quad using `M_CanvasArt`, so you can put a texture on it (artwork, a painting in progress). The colour blocks in front of it are part of the same mesh. |
 | Window daylight | `Anchor_WindowLight` → `Anchor_WindowTarget` | Default sun/sky direction through the window. `Anchor_RainGlass` sits on the glass. |

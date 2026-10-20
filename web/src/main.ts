@@ -11,7 +11,8 @@ import { createAmbient } from './scene/ambient';
 import { applyBakedAO } from './scene/bakedAO';
 import { createMusic } from './inputs/music';
 import { Interactions } from './scene/interact';
-import { startWeather } from './inputs/weather';
+import { searchCity, startWeather, useDeviceLocation } from './inputs/weather';
+import { createPhysics, type Physics } from './scene/physics';
 import { startSensors } from './inputs/sensors';
 import { createPanel } from './ui/panel';
 import { toast } from './ui/toast';
@@ -82,7 +83,11 @@ async function main() {
   let swingT = 0;
 
   room.loop('Plant_Sway');
-  room.loop('Chair_Swivel', 0.6);
+  const chairIdle = room.loop('Chair_Swivel', 0.6);
+  const chairSwivel = room.node('Chair_Swivel');
+  let chairSpin: { t: number; idleTime: number; from: THREE.Quaternion } | null = null;
+  const spinQ = new THREE.Quaternion();
+  const UP = new THREE.Vector3(0, 1, 0);
   const curtains = room.loop('Curtain_Sway', 0.8);
 
   const hourHand = room.node('Clock_HandHour');
@@ -96,11 +101,25 @@ async function main() {
     room.trigger('Sound_Bump');
   };
 
+  // physics (Rapier) loads in the background; until then the physics actions just say so
+  let physics: Physics | null = null;
+  createPhysics(scene, room, (n) => toast(n === 1 ? 'Score! Into the bin' : `Score! ${n} in the bin`))
+    .then((p) => (physics = p))
+    .catch((err) => console.warn('Physics unavailable:', err));
+  const withPhysics = (fn: (p: Physics) => void) => (physics ? fn(physics) : toast('Physics is still loading…'));
+  for (const n of ['Shelf_1', 'Shelf_2', 'Shelf_3']) room.node(n).userData.interactive = 'shelf';
+  room.root.traverse((o) => { if (/^Shelf_\d_Book_\d+$/.test(o.name)) o.userData.interactive = 'shelf'; });
+
   const panel = createPanel({
     simulateMotion: () => registerMotion(),
     soundBump,
     toggleMusic: () => void music.toggle(),
     nextTrack: () => music.next(),
+    searchCity: (name) => void searchCity(name).then((n) => toast(`Weather for ${n}`)).catch((e) => toast(`City not found: ${e.message}`)),
+    useMyLocation: () => void useDeviceLocation().then(() => toast('Weather for your location')).catch((e) => toast(`Location unavailable: ${e.message}`)),
+    tossPaper: () => withPhysics((p) => p.tossPaper()),
+    knockBooks: () => withPhysics((p) => p.knockBooks()),
+    tidyBooks: () => withPhysics((p) => p.tidyBooks()),
   });
 
   new Interactions(camera, renderer.domElement, room, (kind, obj) => {
@@ -125,6 +144,23 @@ async function main() {
       case 'window':
         toast('Hold and drag on the window: up/down = rain, left/right = time');
         break;
+      case 'chair':
+        if (!chairSpin) {
+          chairSpin = { t: 0, idleTime: chairIdle.time, from: chairSwivel.quaternion.clone() };
+          chairIdle.stop();
+        }
+        break;
+      case 'paper':
+        withPhysics((p) => p.tossPaper());
+        break;
+      case 'bin':
+        toast('Click the notepad on the monitor stand to throw a paper ball');
+        break;
+      case 'shelf': {
+        const shelf = Number(/Shelf_(\d)/.exec(obj.name)?.[1]);
+        withPhysics((p) => p.knockBooks(shelf || undefined));
+        break;
+      }
       case 'clock': {
         const h = currentHour();
         toast(`It's ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')} in the room`);
@@ -135,14 +171,15 @@ async function main() {
     }
   });
 
-  startWeather();
+  void startWeather();
   void startSensors();
 
   document.getElementById('loading')?.classList.add('hidden');
 
   const timer = new THREE.Timer();
-  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music } });
+  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, get physics() { return physics; } } });
   let prevAwake = false;
+  let lastBooksFall = -Infinity;
   let statusTimer = 0;
   renderer.setAnimationLoop(() => {
     timer.update();
@@ -155,6 +192,24 @@ async function main() {
       prevAwake = awake;
     }
     if (soundLevel() > config.soundBumpThreshold) soundBump();
+    // a really loud sound knocks the books off their shelves
+    if (soundLevel() > config.booksFallThreshold && now - lastBooksFall > 8000) {
+      lastBooksFall = now;
+      physics?.knockBooks();
+    }
+
+    // chair: one smooth turn on its swivel, then back to the idle sway where it left off
+    if (chairSpin) {
+      chairSpin.t += dt;
+      const k = Math.min(1, chairSpin.t / 1.6);
+      const eased = 1 - Math.pow(1 - k, 3);
+      chairSwivel.quaternion.copy(chairSpin.from).multiply(spinQ.setFromAxisAngle(UP, eased * Math.PI * 2));
+      if (k >= 1) {
+        chairIdle.play();
+        chairIdle.time = chairSpin.idleTime;
+        chairSpin = null;
+      }
+    }
 
     const w = currentWeather();
     curtains.timeScale = w.condition === 'storm' ? 1.6 : 0.8;
@@ -180,6 +235,7 @@ async function main() {
       storm: w.condition === 'storm',
     });
     room.update(dt);
+    physics?.update(dt);
     controls.update();
     renderer.render(scene, camera);
 

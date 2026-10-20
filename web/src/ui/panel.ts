@@ -6,6 +6,11 @@ export interface PanelActions {
   soundBump(): void;
   toggleMusic(): void;
   nextTrack(): void;
+  searchCity(name: string): void;
+  useMyLocation(): void;
+  tossPaper(): void;
+  knockBooks(): void;
+  tidyBooks(): void;
 }
 
 /**
@@ -13,7 +18,7 @@ export interface PanelActions {
  * "manual" overrides the live input until it is switched back to "live".
  */
 export function createPanel(actions: PanelActions) {
-  const status = { time: '', weather: 'loading…', sensor: 'not configured', room: '' };
+  const status = { time: '', weather: 'loading…', sensor: 'not configured', room: '', place: '' };
   const gui = new GUI({ title: 'Room controls' });
   if (window.innerWidth < 700) gui.close();
 
@@ -22,6 +27,13 @@ export function createPanel(actions: PanelActions) {
   t.add(state.time, 'manualHour', 0, 24, 0.25).name('hour')
     .onChange(() => (state.time.mode = 'manual'));
   t.add(status, 'time').name('room time').disable().listen();
+
+  const loc = gui.addFolder('Location');
+  const city = { name: '' };
+  loc.add(city, 'name').name('search city')
+    .onFinishChange((v: string) => v.trim() && actions.searchCity(v.trim()));
+  loc.add(actions, 'useMyLocation').name('use my location');
+  loc.add(status, 'place').name('weather for').disable().listen();
 
   const w = gui.addFolder('Weather');
   w.add(state.weather, 'mode', ['live', 'manual']).name('source').listen();
@@ -57,6 +69,11 @@ export function createPanel(actions: PanelActions) {
   mu.add(state.music, 'volume', 0, 1, 0.01).name('volume');
 
   // one way back from all manual overrides
+  const ph = gui.addFolder('Physics');
+  ph.add(actions, 'tossPaper').name('throw paper in the bin');
+  ph.add(actions, 'knockBooks').name('knock the books over');
+  ph.add(actions, 'tidyBooks').name('tidy the books');
+
   const reset = {
     resetToLive() {
       state.time.mode = 'live';
@@ -73,6 +90,8 @@ export function createPanel(actions: PanelActions) {
     const h = currentHour();
     status.time = `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
     const live = state.weather.live;
+    const src = { default: 'default', 'time zone': 'from your time zone', search: 'searched', device: 'your device' }[state.location.source];
+    status.place = `${state.location.name} (${src})`;
     status.weather = state.weather.error
       ? `unavailable (${state.weather.error})`
       : live ? `${live.condition}, ${Math.round(live.temperature)}°C` : 'loading…';

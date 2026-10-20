@@ -50,7 +50,7 @@ export function createAmbient(scene: THREE.Scene, room: Room) {
   const color = new THREE.Color();
 
   // ---- steam from the mug
-  const STEAM = 16;
+  const STEAM = 12;
   const STEAM_LIFE = 3.4;
   const steam = particles(STEAM, dot);
   const mug = room.worldPosition('Anchor_MugSteam');
@@ -107,10 +107,10 @@ export function createAmbient(scene: THREE.Scene, room: Room) {
         );
         dummy.position.copy(p);
         dummy.quaternion.copy(camera.quaternion);
-        dummy.scale.setScalar(0.02 + 0.05 * a);
+        dummy.scale.setScalar(0.015 + 0.035 * a);
         dummy.updateMatrix();
         steam.setMatrixAt(k, dummy.matrix);
-        steam.setColorAt(k, color.setScalar(Math.pow(Math.sin(Math.PI * a), 1.5) * 0.16));
+        steam.setColorAt(k, color.setScalar(Math.pow(Math.sin(Math.PI * a), 1.5) * 0.06)); // faint: additive
       }
       steam.instanceMatrix.needsUpdate = true;
       steam.instanceColor!.needsUpdate = true;

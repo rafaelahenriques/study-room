@@ -33,7 +33,11 @@ export const CONDITION_PRESETS: Record<Condition, WeatherLook> = {
   snow: { condition: 'snow', rain: 0, cloud: 0.85 },
 };
 
+export type LocationSource = 'default' | 'time zone' | 'search' | 'device';
+
 export const state = {
+  /** where the weather (and the room's clock) comes from */
+  location: { name: 'Lisbon', lat: config.weather.lat, lon: config.weather.lon, source: 'default' as LocationSource },
   time: { mode: 'live' as Mode, manualHour: 14 },
   weather: {
     mode: 'live' as Mode,

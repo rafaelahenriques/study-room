@@ -44,6 +44,7 @@ webgl/
 │   ├── isometricroom.blend          original scene (source of truth, never modified by scripts)
 │   ├── isometricroom_enriched.blend generated: props, materials, animations, anchors
 │   ├── build_enriched_room.py       original → enriched
+│   ├── add_props.py                 adds the paper bin + notepad, splits the shelf books (for physics)
 │   ├── bake_ao.py                   bakes ambient occlusion → web/public/textures/room_ao.jpg
 │   ├── export_glb.py                enriched → web/public/models/study_room.glb
 │   ├── render_preview.py            EEVEE look-dev renders → blender/previews/
@@ -62,9 +63,10 @@ webgl/
 │       ├── scene/outside.ts         procedural view outside the window (+ rain streaks)
 │       ├── scene/ambient.ts         mug steam, sunbeam dust, twinkling string lights
 │       ├── scene/bakedAO.ts         applies the AO baked in Blender (aoMap on uv1)
+│       ├── scene/physics.ts         Rapier physics: paper toss into the bin, falling books
 │       ├── scene/screen.ts          monitor desktop: code editor, weather, now-playing bar, screensaver
 │       ├── scene/interact.ts        hover + click via Blender's `interactive` tags
-│       ├── inputs/weather.ts        Open-Meteo polling
+│       ├── inputs/weather.ts        Open-Meteo weather + the visitor's city (time zone / search / device)
 │       ├── inputs/sensors.ts        MQTT (ESP32) – only active when configured
 │       ├── inputs/music.ts          lo-fi music from the Audius API (headphones)
 │       └── ui/panel.ts, ui/toast.ts manual controls + click captions
@@ -92,12 +94,35 @@ Open http://localhost:5173. The site needs **WebGPU**: recent Chrome or Edge, Sa
 cd blender
 # only to regenerate the enriched file from the original (overwrites manual edits in it):
 /Applications/Blender.app/Contents/MacOS/Blender -b isometricroom.blend --factory-startup -P build_enriched_room.py
+# once (already done): bin + notepad, one object per shelf book
+/Applications/Blender.app/Contents/MacOS/Blender -b isometricroom_enriched.blend -P add_props.py
 # after changing the room: re-bake the ambient occlusion, then export
 /Applications/Blender.app/Contents/MacOS/Blender -b isometricroom_enriched.blend -P bake_ao.py
 /Applications/Blender.app/Contents/MacOS/Blender -b isometricroom_enriched.blend -P export_glb.py
 ```
 
 The bake takes about a minute on the GPU. The export writes straight into `web/public/models/`. If the dev server is running, just reload the page. Node names stay stable, so the website code keeps working.
+
+## Interaction
+
+| Click / control | What happens |
+|---|---|
+| **Notepad** on the monitor riser | Crumples a paper ball and throws it at the bin across the room (physics). Each basket shows "Score!". |
+| **Shelf or book** | Knocks that shelf's books off (physics). Panel → Physics → *tidy the books* puts them back. A very loud sound from the sound sensor knocks them over too. |
+| **Chair** | Spins once on its swivel. |
+| **Window** (hold and drag) | Heartfelt's `iMouse`: up and down = amount of rain, left and right = drop time. |
+| **Lamp, monitor, headphones, drawers** | Lamp on or off, switch screen app, lo-fi music (Audius), open or close the drawers. |
+| Panel → **Location** | Search a city, or *use my location*. By default the weather and room clock follow the city of your browser's time zone. |
+
+**Physics** uses [Rapier](https://rapier.rs) (`@dimforge/rapier3d-compat`), loaded in the background after the room appears:
+- **Static scene:** triangle meshes of the room and furniture, built from the GLB.
+- **Books:** each book is a convex-hull body. It stays fixed until it's knocked over, then becomes dynamic.
+- **Paper balls:** spheres with continuous collision detection (CCD), so the fast balls don't pass through the bin wall.
+- **When nothing moves,** the simulation is skipped.
+
+**Location privacy:**
+- **By default,** only the time-zone city name goes to the Open-Meteo geocoding API, with no permission prompt.
+- **"Use my location"** asks the browser for permission first, then sends the coordinates only to Open-Meteo, to get the weather.
 
 ## Baking
 
@@ -132,6 +157,8 @@ Flash `firmware/studyroom_sensor/studyroom_sensor.ino` to an ESP32. Before you d
 | Rain on glass | done (WGSL port of Heartfelt via wgslFn, refracts the outside view, drag = iMouse) |
 | Snow outside | done (WGSL port of Mdt3Df via wgslFn, shown when it snows) |
 | Baked ambient occlusion | done (Cycles bake, aoMap on uv1) |
+| Physics | done (Rapier: paper toss into the bin, books knocked off the shelves) |
+| Visitor's city | done (weather + room clock follow the visitor's city) |
 | Ambient animation | done (mug steam, sunbeam dust, twinkling lights, rain streaks outside) |
 | Monitor screen | done (live canvas desktop: code + weather) |
 | Headphones music | done (Audius trending Lo-Fi, now-playing pill with credit) |

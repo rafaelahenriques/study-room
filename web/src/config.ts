@@ -39,4 +39,6 @@ export const config = {
   /** Sound level (0–1) that triggers the Sound_Bump reaction. */
   soundBumpThreshold: 0.6,
   soundBumpCooldownSeconds: 1.5,
+  /** Sound level (0–1) loud enough to knock the books off the shelves. */
+  booksFallThreshold: 0.85,
 };
