@@ -40,8 +40,10 @@ export class Lighting {
   private readonly sunBase = new THREE.Vector3();
   private readonly tmp = new THREE.Vector3();
   private readonly mats;
+  private readonly lampAnchor: THREE.Object3D;
+  private readonly lampTargetAnchor: THREE.Object3D;
 
-  constructor(private readonly scene: THREE.Scene, private readonly room: Room) {
+  constructor(private readonly scene: THREE.Scene, room: Room) {
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const cam = this.sun.shadow.camera as THREE.OrthographicCamera;
@@ -63,6 +65,8 @@ export class Lighting {
       fairy: room.material('M_StringLightBulb'),
     };
     this.mats.bulb.emissiveIntensity = 0;
+    this.lampAnchor = room.node('Anchor_LampLight');
+    this.lampTargetAnchor = room.node('Anchor_LampTarget');
   }
 
   update(dt: number, now = performance.now()): void {
@@ -98,8 +102,8 @@ export class Lighting {
     if (bg?.isColor) bg.lerpColors(PALETTE.bgNight, PALETTE.bgDay, day).lerp(PALETTE.bgGrey, overcast * 0.35 * day);
 
     // desk lamp follows the animated head
-    this.room.worldPosition('Anchor_LampLight', this.lamp.position);
-    this.room.worldPosition('Anchor_LampTarget', this.lamp.target.position);
+    this.lampAnchor.getWorldPosition(this.lamp.position);
+    this.lampTargetAnchor.getWorldPosition(this.lamp.target.position);
     this.lamp.intensity = 6 * L.awake;
     this.mats.bulb.emissiveIntensity = 3 * L.awake;
 

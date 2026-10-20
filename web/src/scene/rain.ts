@@ -77,10 +77,12 @@ export function createRainGlass(glass: THREE.Mesh, opts: RainGlassOptions) {
   glass.material = material;
 
   const w = new THREE.Vector3();
-  const toScreen = (local: THREE.Vector3, camera: THREE.Camera) => {
+  const s0 = new THREE.Vector2();
+  const s1 = new THREE.Vector2();
+  const toScreen = (local: THREE.Vector3, camera: THREE.Camera, out: THREE.Vector2) => {
     w.copy(local);
     glass.localToWorld(w).project(camera);
-    return new THREE.Vector2((w.x + 1) / 2, (1 - w.y) / 2);
+    return out.set((w.x + 1) / 2, (1 - w.y) / 2);
   };
 
   // ---- interaction: dragging on the glass is Shadertoy's iMouse
@@ -148,9 +150,9 @@ export function createRainGlass(glass: THREE.Mesh, opts: RainGlassOptions) {
       const T = uniforms.iTime.value + mouse.x * 2; // T = iTime + M.x * 2, as in the shader
       flash = Math.max(0, lightningAt(T)) * eased.storm;
 
-      const s0 = toScreen(c00, camera);
-      uniforms.screenU.value.copy(toScreen(c10, camera)).sub(s0);
-      uniforms.screenV.value.copy(toScreen(c01, camera)).sub(s0);
+      toScreen(c00, camera, s0);
+      uniforms.screenU.value.copy(toScreen(c10, camera, s1)).sub(s0);
+      uniforms.screenV.value.copy(toScreen(c01, camera, s1)).sub(s0);
     },
   };
 }

@@ -56,6 +56,18 @@ export function createPanel(actions: PanelActions) {
   mu.add(actions, 'nextTrack').name('next track');
   mu.add(state.music, 'volume', 0, 1, 0.01).name('volume');
 
+  // one way back from all manual overrides
+  const reset = {
+    resetToLive() {
+      state.time.mode = 'live';
+      state.weather.mode = 'live';
+      state.sound.mode = 'live';
+      state.motion.keepAwake = false;
+      state.screen.app = 'auto';
+    },
+  };
+  gui.add(reset, 'resetToLive').name('reset to live');
+
   /** refresh read-only status lines (call a few times per second) */
   function refresh(awake: boolean) {
     const h = currentHour();

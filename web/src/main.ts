@@ -18,6 +18,7 @@ import { toast } from './ui/toast';
 import { currentHour, currentWeather, isAwake, registerMotion, soundLevel, state } from './state/roomState';
 
 const VIEW_HEIGHT = 2.1; // metres visible vertically at zoom 1
+const VIEW_MIN_HALF_WIDTH = 2.0; // keeps the whole room in view on narrow (portrait) screens
 
 async function main() {
   // the shaders are WGSL (wgslFn), so this needs real WebGPU — no WebGL2 fallback
@@ -37,14 +38,26 @@ async function main() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#e9dfd3');
 
-  const aspect = window.innerWidth / window.innerHeight;
-  const camera = new THREE.OrthographicCamera(-VIEW_HEIGHT * aspect, VIEW_HEIGHT * aspect, VIEW_HEIGHT, -VIEW_HEIGHT, 0.01, 50);
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 50);
   camera.position.set(-4, 3.8, -4);
+  // orthographic frustum from the canvas aspect: fixed height, but never narrower than the room
+  const fitCamera = () => {
+    const aspect = window.innerWidth / window.innerHeight;
+    const halfHeight = Math.max(VIEW_HEIGHT, VIEW_MIN_HALF_WIDTH / aspect);
+    camera.left = -halfHeight * aspect;
+    camera.right = halfHeight * aspect;
+    camera.top = halfHeight;
+    camera.bottom = -halfHeight;
+    camera.updateProjectionMatrix();
+  };
+  fitCamera();
 
   const progress = document.getElementById('loading-progress');
   const room = await Room.load(config.modelUrl, (f) => progress && (progress.style.width = `${Math.round(f * 100)}%`));
   scene.add(room.root);
-  await applyBakedAO(room, `${import.meta.env.BASE_URL}textures/room_ao.jpg`);
+  // the baked AO is a nice-to-have: without it the room still renders, just without contact shadows
+  await applyBakedAO(room, `${import.meta.env.BASE_URL}textures/room_ao.jpg`)
+    .catch((err) => console.warn('Baked AO not loaded, continuing without it:', err));
 
   // camera: orbit only around the open corner of the room
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -153,7 +166,7 @@ async function main() {
     lighting.flash = glass.flash;
     lighting.update(dt, now);
     const L = lighting.levels;
-    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain, snow: w.condition === 'snow' ? 1 : 0, flash: glass.flash });
+    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain, snow: w.condition === 'snow' ? 1 : 0, flash: glass.flash }, dt);
     monitor.update(dt, L.awake);
     ambient.update(dt, camera, { sun: L.day * (1 - Math.max(L.cloud, L.rain)) });
     music.update(dt);
@@ -178,10 +191,9 @@ async function main() {
   });
 
   window.addEventListener('resize', () => {
-    const a = window.innerWidth / window.innerHeight;
-    camera.left = -VIEW_HEIGHT * a;
-    camera.right = VIEW_HEIGHT * a;
-    camera.updateProjectionMatrix();
+    fitCamera();
+    // the device pixel ratio can change too (window moved to another screen), same cap as at start
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 }

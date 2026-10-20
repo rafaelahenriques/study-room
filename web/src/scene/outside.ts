@@ -219,14 +219,14 @@ export function createOutsideView(room: Room) {
 
   let snowEased = 0;
   return {
-    update(i: OutsideInputs) {
+    update(i: OutsideInputs, dt: number) {
       const elev = Math.sin((Math.PI * (i.hour - 6)) / 12);
       const dawn = (1 - smoothstepJS(0.0, 0.35, Math.abs(elev))) * Math.min(1, i.day * 2);
       const snowDim = 1 - 0.3 * snowEased; // a heavier, darker sky so the flakes stand out
       setColor(u.zenith, blend(P.zenith, i, dawn).multiplyScalar((1 + 2.5 * (i.flash ?? 0)) * snowDim));
       setColor(u.horizon, blend(P.horizon, i, dawn).multiplyScalar((1 + 2 * (i.flash ?? 0)) * snowDim));
       setColor(u.cloud, blend(P.cloud, i, dawn));
-      snowEased += (i.snow - snowEased) * 0.02;
+      snowEased += (i.snow - snowEased) * (1 - Math.exp(-dt * 1.2)); // ~1 s fade, any frame rate
       u.snow.value = snowEased;
       u.rain.value = i.rain;
       const white = tmp2.set('#e8eef3').multiplyScalar(0.3 + 0.7 * i.day);

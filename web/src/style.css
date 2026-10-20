@@ -90,9 +90,22 @@ html, body {
 }
 #credits a { color: inherit; }
 
-.lil-gui.root { --background-color: rgba(246, 241, 231, 0.92); --text-color: #3b3633; --title-background-color: #e8dcc6;
+/* lil-gui defines its variables on every .lil-gui (folders too) and injects its CSS first,
+   so this rule overrides them everywhere */
+.lil-gui { --background-color: rgba(246, 241, 231, 0.92); --text-color: #3b3633; --title-background-color: #e8dcc6;
   --title-text-color: #3b3633; --widget-color: #e3d8c6; --hover-color: #d8ccb8; --focus-color: #cfc2ab;
   --number-color: #8a5a3c; --string-color: #6f8a6e; }
+
+/* lil-gui's own focus hint is very faint: a clear outline for keyboard users */
+.lil-gui :is(button, input, select):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* read-only status rows: readable (lil-gui dims disabled rows to 50 %) */
+.lil-gui .lil-controller.lil-disabled { opacity: 0.8; }
+
+/* small screens: keep the now-playing pill and captions above the credits line */
+@media (max-width: 600px) {
+  #nowplaying { bottom: 44px; }
+  #toast { bottom: 116px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   #toast, #loading { transition: none; }
