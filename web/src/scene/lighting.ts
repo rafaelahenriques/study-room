@@ -32,7 +32,10 @@ export class Lighting {
 
   /** lightning flash from the rain shader (0 … ~1) */
   flash = 0;
-  /** 0 … 1: the calendar's day-change dims the room towards night and back (not part of the weather) */
+  /**
+   * 0 … 1: the calendar's day change. The light swings towards the opposite of now and back:
+   * day → night → day, or at night night → daylight → night. Not part of the weather or the time.
+   */
   dayDip = 0;
   private dayNatural = 1;
 
@@ -80,7 +83,8 @@ export class Lighting {
     // sun elevation: -1 at midnight, 0 at 6h/18h, 1 at noon
     const elev = Math.sin((Math.PI * (hour - 6)) / 12);
     this.dayNatural = ease(this.dayNatural, smoothstep(-0.12, 0.3, elev), dt, 1.5);
-    L.day = this.dayNatural * (1 - 0.85 * this.dayDip);
+    const opposite = this.dayNatural > 0.5 ? 0 : 1;
+    L.day = THREE.MathUtils.lerp(this.dayNatural, opposite, 0.85 * this.dayDip);
     L.rain = ease(L.rain, w.rain, dt, 1.0);
     L.cloud = ease(L.cloud, w.cloud, dt, 1.0);
     L.awake = ease(L.awake, isAwake(now) ? 1 : 0, dt, 2.0);

@@ -11,8 +11,8 @@ import { locationToday, state } from '../state/roomState';
  *
  * A flip: the page keeps showing the old date while the surface underneath already shows the
  * new one; the page swings over the top and fades out, then returns (invisibly) to rest with
- * the new date. Meanwhile the room dims towards night and back (Lighting.dayDip), which never
- * touches the weather or the time-of-day settings.
+ * the new date. Meanwhile the light swings to the opposite of now and back (Lighting.dayDip):
+ * by day it goes dark, at night it brightens. It never touches the weather or the time settings.
  */
 
 const W = 512;

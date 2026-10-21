@@ -63,7 +63,7 @@ Two Shadertoy shaders are ported from GLSL to **WGSL**, the way it's done in cla
 | **Window** (hold and drag) | Heartfelt's `iMouse`: up and down = amount of rain while you hold, left and right = drop time (stays where you leave it). On release the rain goes back to the weather, as on Shadertoy. |
 | **Not sure what's clickable?** | Hover for a label and a glow, or press *What can I click?* (bottom left) to show every hotspot. They also appear for a few seconds after loading. |
 | **Lamp** | Turns the room's lamp off when it's on (and on when it's off). It stays on while music plays or the sensor sees motion. |
-| **Calendar** (on the dresser) | Shows today's date in the room's city, like the room clock (so Honolulu can still be on yesterday). Next day: the page flips over the top and the room dims towards night and back. A date preview only; it never changes the weather or the time. Panel → Room → *Reset date* returns to today. |
+| **Calendar** (on the dresser) | Shows today's date in the room's city, like the room clock (so Honolulu can still be on yesterday). Next day: the page flips over the top and the light swings through a day change (by day it goes dark and back, at night it brightens to daylight and back). A date preview only; it never changes the weather or the time. Panel → Room → *Reset date* returns to today. |
 | **Globe** (shelf 3) | One full spin (2 s). Clicks during a spin are ignored. |
 | **Easel** | Doodle mode: the camera flies to face the canvas, and you draw with the room's colours (3 brush sizes, eraser, undo, clear). *Done* or Esc steps back. The drawing stays on the easel in your browser (localStorage) and *Save image* downloads a PNG. Other visitors don't see it. |
 | **Chair** | Spins once on its swivel. |
