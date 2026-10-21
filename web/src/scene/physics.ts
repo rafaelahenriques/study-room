@@ -47,7 +47,7 @@ function worldTriangles(node: THREE.Object3D) {
   node.updateWorldMatrix(true, true);
   node.traverse((o) => {
     const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
+    if (!mesh.isMesh || mesh.userData.glow) return; // skip the hover-glow copies (ui/hints.ts)
     const g = mesh.geometry;
     const pos = g.getAttribute('position');
     const base = verts.length / 3;

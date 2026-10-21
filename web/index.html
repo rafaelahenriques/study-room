@@ -9,12 +9,26 @@
   </head>
   <body>
     <div id="app"></div>
-    <div id="loading" role="status" aria-live="polite">
+    <div id="loading">
       <div class="loading-card">
-        <p class="loading-title">Tidying up the room…</p>
-        <div class="loading-bar"><span id="loading-progress"></span></div>
+        <div class="loading-window" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <h1 class="loading-title">Study Room</h1>
+        <p class="loading-step" id="loading-step" role="status" aria-live="polite">Starting…</p>
+        <div class="loading-bar" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="loading-progress"></span></div>
+        <p class="loading-tip">When it’s ready, hold and drag on the window to change the rain.</p>
+        <div class="loading-help" id="loading-help" hidden>
+          <p>Open the room in a browser with WebGPU:</p>
+          <ul>
+            <li>Chrome or Edge 113 or newer (desktop, Android)</li>
+            <li>Safari 26 (macOS Tahoe, iOS 26)</li>
+            <li>Firefox 141 or newer on Windows</li>
+          </ul>
+        </div>
       </div>
     </div>
+    <button id="hints-btn" type="button" aria-pressed="false">What can I click?</button>
     <div id="toast" role="status" aria-live="polite"></div>
     <section id="nowplaying" hidden aria-label="Now playing">
       <img class="np-art" alt="" width="44" height="44" />

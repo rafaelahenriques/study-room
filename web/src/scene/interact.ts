@@ -2,8 +2,13 @@ import * as THREE from 'three/webgpu';
 import type { Room } from './room';
 
 export type PickHandler = (kind: string, object: THREE.Object3D) => void;
+/** called on every pointer move: the clickable object under the pointer (or null) and where */
+export type HoverHandler = (object: THREE.Object3D | null, x: number, y: number) => void;
 
-/** Hover cursor + click picking via the `interactive` tags exported from Blender. */
+/**
+ * Hover + click picking via the `interactive` tags exported from Blender.
+ * Only kinds accepted by `isClickable` count, so props without an action don't look clickable.
+ */
 export class Interactions {
   private readonly ray = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
@@ -14,10 +19,16 @@ export class Interactions {
     private readonly dom: HTMLElement,
     private readonly room: Room,
     private readonly onPick: PickHandler,
+    private readonly onHover: HoverHandler = () => {},
+    private readonly isClickable: (kind: string) => boolean = () => true,
   ) {
     dom.addEventListener('pointermove', (e) => {
-      dom.style.cursor = this.pick(e) ? 'pointer' : 'grab';
+      // while a button is held the camera is orbiting (or the window is being dragged): no hover
+      const hit = e.buttons || e.pointerType === 'touch' ? null : this.pick(e);
+      dom.style.cursor = hit ? 'pointer' : e.buttons ? 'grabbing' : 'grab';
+      this.onHover(hit, e.clientX, e.clientY);
     });
+    dom.addEventListener('pointerleave', (e) => this.onHover(null, e.clientX, e.clientY));
     dom.addEventListener('pointerdown', (e) => (this.downAt = { x: e.clientX, y: e.clientY }));
     dom.addEventListener('pointerup', (e) => {
       // ignore drags (camera orbit)
@@ -33,6 +44,6 @@ export class Interactions {
     this.ray.setFromCamera(this.ndc, this.camera);
     let o: THREE.Object3D | null = this.ray.intersectObject(this.room.root, true)[0]?.object ?? null;
     while (o && !o.userData.interactive) o = o.parent;
-    return o;
+    return o && this.isClickable(o.userData.interactive as string) ? o : null;
   }
 }

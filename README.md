@@ -71,7 +71,7 @@ webgl/
 │       ├── inputs/weather.ts        Open-Meteo weather + the visitor's city (time zone / search / device)
 │       ├── inputs/sensors.ts        MQTT (ESP32) – only active when configured
 │       ├── inputs/music.ts          lo-fi music from the Audius API (headphones)
-│       └── ui/panel.ts, ui/toast.ts manual controls + click captions
+│       └── ui/                      panel.ts (room controls), hints.ts (what's clickable), loading.ts, toast.ts
 ├── firmware/studyroom_sensor/    ESP32 sketch: PIR motion (+ optional mic) → MQTT
 └── NEXT_STEPS.md                 the build guide: what's left and how to do it
 ```
@@ -112,6 +112,7 @@ The bake takes about a minute on the GPU. The export writes straight into `web/p
 | **Notepad** on the monitor riser | Crumples a paper ball and throws it at the bin across the room (physics). Each basket shows "Score!". |
 | **Shelf or book** | Knocks that shelf's books off (physics). Panel → Physics → *tidy the books* puts them back. A very loud sound from the sound sensor knocks them over too. |
 | **Chair** | Spins once on its swivel. |
+| **Not sure what's clickable?** | Hover for a label and a glow, or press *What can I click?* (bottom left) to show every hotspot. They also appear for a few seconds after loading. |
 | **Window** (hold and drag) | Heartfelt's `iMouse`: up and down = amount of rain while you hold, left and right = drop time (stays where you leave it). On release the rain goes back to the weather, as on Shadertoy. |
 | **Lamp, monitor, headphones, drawers** | Lamp on or off, switch screen app, lo-fi music (Audius), open or close the drawers. |
 | Panel → **Location** | Search a city, or *use my location*. By default the weather and room clock follow the city of your browser's time zone. |
@@ -122,14 +123,14 @@ Every input writes into `state` ([`roomState.ts`](web/src/state/roomState.ts)); 
 
 | Property | Live source | Manual | Back to live |
 |---|---|---|---|
-| Time of day | the location's clock (Open-Meteo UTC offset), else this device's clock | panel hour slider | *source → live* or *back to live* |
-| Weather | Open-Meteo, every 15 min. If it fails, the room shows the manual values and the panel says so | panel condition / rain / clouds | same |
-| Sound level | ESP32 microphone over MQTT. 0 when no sensor is connected | panel level slider | same |
+| Time of day | the location's clock (Open-Meteo UTC offset), else this device's clock | *Pick a time* + hour slider | *Live* or *Back to live* |
+| Weather | Open-Meteo, every 15 min. If it fails, the room shows clear skies and the panel says so | a condition chip (the rain slider appears for rain and storm) | same |
+| Sound level | ESP32 microphone over MQTT. 0 when no sensor is connected | *Set by hand* + level slider | same |
 | Room awake | any of: motion in the last 60 s (sensor, *simulate motion*, clicking the monitor, starting music), sensor reporting motion, music playing, *keep room awake* / lamp | — | *back to live* clears *keep room awake* |
 
 **Stale sensor data:** without any MQTT message for 30 s, the sensor counts as offline: motion and sound fall back to inactive and 0. Without `VITE_MQTT_URL` the sensor code doesn't load at all.
 
-The panel's **Now** folder shows what the room is actually using and where it comes from.
+The panel's header shows what the room is using right now (city · time · weather), so it can stay collapsed. *Back to live* only appears while something is overridden.
 
 **Physics** uses [Rapier](https://rapier.rs) (`@dimforge/rapier3d-compat`), loaded in the background after the room appears:
 - **Static scene:** triangle meshes of the room and furniture, built from the GLB.

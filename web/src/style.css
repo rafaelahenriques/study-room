@@ -2,6 +2,11 @@
   --ink: #3b3633;
   --paper: #f6f1e7;
   --accent: #c66f4e;
+  --sage: #6f8a6e;
+  --chip: #e8dcc6;
+  --chip-hover: #ddd0b8;
+  --line: rgba(59, 54, 51, 0.12);
+  --muted: #7a716a;
   font-family: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ink);
 }
@@ -29,10 +34,38 @@ html, body {
   z-index: 10;
 }
 #loading.hidden { opacity: 0; pointer-events: none; }
-.loading-card { width: min(320px, 80vw); text-align: center; }
-.loading-title { margin: 0 0 12px; font-size: 15px; }
-.loading-bar { height: 6px; border-radius: 3px; background: rgba(59, 54, 51, 0.12); overflow: hidden; }
+.loading-card { width: min(340px, calc(100vw - 48px)); display: grid; justify-items: center; gap: 10px; text-align: center; }
+.loading-title { margin: 6px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.loading-step { margin: 0; font-size: 14px; min-height: 1.4em; font-variant-numeric: tabular-nums; }
+.loading-bar { width: 100%; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .loading-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+.loading-tip { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); max-width: 30ch; }
+.loading-help { font-size: 13px; text-align: left; background: var(--paper); border-radius: 12px; padding: 10px 14px; }
+.loading-help p { margin: 0 0 4px; font-weight: 600; }
+.loading-help ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.loading-card.failed .loading-bar, .loading-card.failed .loading-tip { display: none; }
+.loading-card.failed .loading-step { font-weight: 600; }
+
+/* a little window with rain running down it */
+.loading-window {
+  position: relative; width: 84px; height: 100px; border-radius: 6px; overflow: hidden;
+  background: linear-gradient(#9fb6c8, #cfd9df); border: 5px solid #f6f1e7;
+  box-shadow: 0 0 0 1px var(--line), 0 10px 24px rgba(59, 54, 51, 0.18);
+}
+.loading-window::before, .loading-window::after { content: ''; position: absolute; background: #f6f1e7; z-index: 1; }
+.loading-window::before { left: 50%; top: 0; bottom: 0; width: 4px; transform: translateX(-50%); }
+.loading-window::after { top: 48%; left: 0; right: 0; height: 4px; }
+.loading-window i {
+  position: absolute; top: -12px; width: 3px; height: 9px; border-radius: 2px; background: rgba(255, 255, 255, 0.85);
+  animation: drop 1.6s linear infinite;
+}
+.loading-window i:nth-child(1) { left: 14%; animation-delay: 0s; }
+.loading-window i:nth-child(2) { left: 30%; animation-delay: 0.7s; animation-duration: 2s; }
+.loading-window i:nth-child(3) { left: 44%; animation-delay: 1.2s; }
+.loading-window i:nth-child(4) { left: 62%; animation-delay: 0.3s; animation-duration: 1.8s; }
+.loading-window i:nth-child(5) { left: 76%; animation-delay: 1s; }
+.loading-window i:nth-child(6) { left: 88%; animation-delay: 0.5s; animation-duration: 2.2s; }
+@keyframes drop { to { transform: translateY(124px); } }
 
 #toast {
   position: fixed;
@@ -90,23 +123,122 @@ html, body {
 }
 #credits a { color: inherit; }
 
-/* lil-gui defines its variables on every .lil-gui (folders too) and injects its CSS first,
-   so this rule overrides them everywhere */
-.lil-gui { --background-color: rgba(246, 241, 231, 0.92); --text-color: #3b3633; --title-background-color: #e8dcc6;
-  --title-text-color: #3b3633; --widget-color: #e3d8c6; --hover-color: #d8ccb8; --focus-color: #cfc2ab;
-  --number-color: #8a5a3c; --string-color: #6f8a6e; }
+/* ---------- room controls ---------- */
+#controls {
+  position: fixed; top: 12px; right: 12px; z-index: 6;
+  width: min(320px, calc(100vw - 24px));
+  max-height: calc(100% - 24px); display: flex; flex-direction: column;
+  background: rgba(246, 241, 231, 0.96); border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(59, 54, 51, 0.18), 0 0 0 1px var(--line);
+  font-size: 13px; line-height: 1.35;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+:where(#controls) button { font: inherit; color: inherit; }
+#controls :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ctl-head {
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 8px;
+  width: 100%; padding: 10px 14px; border: 0; background: none; text-align: left; cursor: pointer; border-radius: 14px;
+}
+.ctl-title { font-weight: 700; font-size: 14px; }
+.ctl-now { grid-row: 2; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ctl-chev { grid-row: 1 / 3; grid-column: 2; align-self: center; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin: -4px 4px 0; transition: transform 0.2s; }
+#controls.closed .ctl-chev { transform: rotate(-135deg); margin-top: 4px; }
+#controls.closed .ctl-body { display: none; }
+.ctl-body { overflow-y: auto; padding: 0 14px 12px; display: grid; gap: 12px; }
 
-/* lil-gui's own focus hint is very faint: a clear outline for keyboard users */
-.lil-gui :is(button, input, select):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-/* read-only status rows: readable (lil-gui dims disabled rows to 50 %) */
-.lil-gui .lil-controller.lil-disabled { opacity: 0.8; }
+.ctl-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: 10px; background: var(--chip); }
+.ctl-tabs button { border: 0; background: none; padding: 6px 4px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.ctl-tabs button[aria-selected="true"] { background: var(--paper); box-shadow: 0 1px 3px rgba(59, 54, 51, 0.15); }
+.ctl-pane { display: grid; gap: 14px; }
+.ctl-pane[hidden] { display: none; }
+.ctl-field { display: grid; gap: 6px; }
+.ctl-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.ctl-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.ctl-hint[hidden], .ctl-row[hidden] { display: none; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips button {
+  border: 0; border-radius: 999px; padding: 6px 11px; background: var(--chip); cursor: pointer;
+}
+.chips button:hover { background: var(--chip-hover); }
+.chips button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.chips button:disabled { opacity: 0.45; cursor: default; }
+
+.ctl-row { display: grid; grid-template-columns: auto 1fr 3.2em; align-items: center; gap: 8px; }
+.ctl-row:has(> input:first-child) { grid-template-columns: 1fr 3.2em; }
+.ctl-row input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+.ctl-row output { text-align: right; font-variant-numeric: tabular-nums; }
+
+.city { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.city input {
+  font: inherit; color: var(--ink); width: 100%; min-width: 0; padding: 7px 10px; border-radius: 9px;
+  border: 1px solid var(--line); background: #fffaf1;
+}
+.icon-btn { display: grid; place-items: center; width: 34px; border: 0; border-radius: 9px; background: var(--chip); cursor: pointer; }
+.icon-btn:hover { background: var(--chip-hover); }
+.city-list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 2; margin: 0; padding: 4px; list-style: none;
+  background: #fffaf1; border-radius: 10px; box-shadow: 0 8px 24px rgba(59, 54, 51, 0.2), 0 0 0 1px var(--line);
+}
+.city-list [role="option"] { display: grid; padding: 6px 8px; border-radius: 7px; cursor: pointer; }
+.city-list [role="option"][aria-selected="true"], .city-list [role="option"]:hover { background: var(--chip); }
+.city-name { font-weight: 600; }
+.city-detail, .city-msg { font-size: 12px; color: var(--muted); }
+.city-msg { padding: 6px 8px; }
+
+.ctl-status { margin: 0; display: grid; gap: 4px; }
+.ctl-status div { display: flex; justify-content: space-between; gap: 8px; }
+.ctl-status dt { color: var(--muted); }
+.ctl-status dd { margin: 0; font-weight: 600; }
+
+.ctl-reset { border: 0; border-radius: 9px; padding: 8px; background: var(--chip); cursor: pointer; font-weight: 600; }
+.ctl-reset:hover { background: var(--chip-hover); }
+.ctl-reset[hidden] { display: none; }
+
+/* ---------- what's clickable ---------- */
+#hints-btn {
+  position: fixed; left: 12px; bottom: 40px; z-index: 5;
+  border: 0; border-radius: 999px; padding: 7px 13px; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--ink); background: var(--paper); box-shadow: 0 4px 14px rgba(59, 54, 51, 0.16); cursor: pointer;
+}
+#hints-btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+#hints-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#hover-tip {
+  position: fixed; left: 0; top: 0; z-index: 7; pointer-events: none;
+  padding: 5px 10px; border-radius: 999px; background: var(--ink); color: var(--paper);
+  font-size: 12.5px; white-space: nowrap; opacity: 0; transition: opacity 0.12s;
+}
+#hover-tip.show { opacity: 1; }
+
+#hotspots { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+#hotspots.show { opacity: 1; }
+.hs { position: absolute; left: 0; top: 0; }
+.hs-dot {
+  position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 3px rgba(246, 241, 231, 0.9);
+}
+.hs-dot::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--accent);
+  animation: ping 1.6s ease-out infinite;
+}
+.hs.left .hs-label { left: auto; right: 12px; }
+@keyframes ping { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.4); opacity: 0; } }
+.hs-label {
+  position: absolute; left: 12px; top: 0; transform: translateY(-50%);
+  padding: 3px 8px; border-radius: 999px; background: var(--paper); color: var(--ink);
+  font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(59, 54, 51, 0.18);
+}
 
 /* small screens: keep the now-playing pill and captions above the credits line */
 @media (max-width: 600px) {
-  #nowplaying { bottom: 44px; }
-  #toast { bottom: 116px; }
+  #nowplaying { bottom: 84px; }
+  #toast { bottom: 150px; }
+  #controls { max-height: 70%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #toast, #loading { transition: none; }
+  #toast, #loading, #hotspots, #hover-tip { transition: none; }
+  .loading-window i, .hs-dot::after { animation: none; }
+  .loading-window i { top: 30%; }
 }

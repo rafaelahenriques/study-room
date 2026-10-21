@@ -11,28 +11,34 @@ import { createAmbient } from './scene/ambient';
 import { applyBakedAO } from './scene/bakedAO';
 import { createMusic } from './inputs/music';
 import { Interactions } from './scene/interact';
-import { searchCity, startWeather, useDeviceLocation } from './inputs/weather';
+import { chooseCity, findCities, startWeather, useDeviceLocation } from './inputs/weather';
 import { createPhysics, type Physics } from './scene/physics';
 import { startSensors } from './inputs/sensors';
 import { createPanel } from './ui/panel';
 import { toast } from './ui/toast';
+import { createHints, isClickable } from './ui/hints';
+import { loadingDone, loadingFailed, loadingStep } from './ui/loading';
 import { currentHour, currentWeather, isAwake, registerMotion, soundLevel, state } from './state/roomState';
 
 const VIEW_HEIGHT = 2.1; // metres visible vertically at zoom 1
 const VIEW_MIN_HALF_WIDTH = 2.0; // keeps the whole room in view on narrow (portrait) screens
 
+/** the browser can't run this (no WebGPU): the loading screen lists browsers that work */
+class NeedsWebGPU extends Error {}
+
 async function main() {
   // the shaders are WGSL (wgslFn), so this needs real WebGPU — no WebGL2 fallback
+  loadingStep('Starting WebGPU…', 0.02);
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown | null> } }).gpu;
   if (!gpu || !(await gpu.requestAdapter())) {
-    throw new Error('this experiment needs WebGPU. Try a recent Chrome or Edge, Safari 26+, or Firefox 141+ on Windows.');
+    throw new NeedsWebGPU('This browser can’t run WebGPU, which the room’s shaders need.');
   }
   const renderer = new THREE.WebGPURenderer({ antialias: true });
   await renderer.init();
   // init() quietly switches to the WebGL2 backend if the GPU device can't be created,
   // and the WGSL ports would then fail to compile: say so instead of showing a broken room
   if (!(renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend) {
-    throw new Error('WebGPU could not start on this device (the browser fell back to WebGL). Try a recent Chrome or Edge.');
+    throw new NeedsWebGPU('WebGPU couldn’t start on this device (the browser fell back to WebGL).');
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -58,10 +64,12 @@ async function main() {
   };
   fitCamera();
 
-  const progress = document.getElementById('loading-progress');
-  const room = await Room.load(config.modelUrl, (f) => progress && (progress.style.width = `${Math.round(f * 100)}%`));
+  // progress: the model download is most of the wait (0.05 → 0.8)
+  loadingStep('Loading the room…', 0.05);
+  const room = await Room.load(config.modelUrl, (f) => loadingStep(`Loading the room… ${Math.round(f * 100)}%`, 0.05 + f * 0.75));
   scene.add(room.root);
   // the baked AO is a nice-to-have: without it the room still renders, just without contact shadows
+  loadingStep('Adding the baked shadows…', 0.82);
   await applyBakedAO(room, `${import.meta.env.BASE_URL}textures/room_ao.jpg`)
     .catch((err) => console.warn('Baked AO not loaded, continuing without it:', err));
 
@@ -124,13 +132,19 @@ async function main() {
     soundBump,
     toggleMusic,
     nextTrack: () => music.next(),
-    searchCity: (name) => void searchCity(name).then((n) => toast(`Weather for ${n}`)).catch((e) => toast(`City not found: ${e.message}`)),
+    findCities: (q) => findCities(q),
+    chooseCity: (place) => {
+      chooseCity(place);
+      toast(`Weather for ${place.name}`);
+    },
     useMyLocation: () => void useDeviceLocation().then(() => toast('Weather for your location')).catch((e) => toast(`Location unavailable: ${e.message}`)),
     tossPaper: () => withPhysics((p) => p.tossPaper()),
     knockBooks: () => withPhysics((p) => p.knockBooks()),
     tidyBooks: () => withPhysics((p) => p.tidyBooks()),
+    physicsReady: () => physics !== null,
   });
 
+  const hints = createHints(room, camera, renderer.domElement);
   new Interactions(camera, renderer.domElement, room, (kind, obj) => {
     switch (kind) {
       case 'lamp':
@@ -175,17 +189,18 @@ async function main() {
         toast(`It's ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')} in the room`);
         break;
       }
-      default:
-        toast(`${obj.name.replace(/_/g, ' ')}`);
     }
-  });
+  }, hints.hover, isClickable);
 
   void startWeather();
   void startSensors();
 
-  document.getElementById('loading')?.classList.add('hidden');
-  // the shader interaction is the heart of the piece, but the window is small: point it out once
-  toast('Tip: hold and drag on the window to change the rain', 7000);
+  // compile every material now, so the first frames don't stall while shaders build
+  loadingStep('Preparing the shaders…', 0.9);
+  await renderer.compileAsync(scene, camera);
+  loadingDone();
+  // show what can be clicked (the window drag is the main one) for a few seconds
+  hints.flash(7);
 
   const timer = new THREE.Timer();
   if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, get physics() { return physics; } } });
@@ -249,6 +264,7 @@ async function main() {
     physics?.update(dt);
     controls.update();
     renderer.render(scene, camera);
+    hints.update();
 
     statusTimer += dt;
     if (statusTimer > 0.25) {
@@ -267,6 +283,6 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
-  const title = document.querySelector('.loading-title');
-  if (title) title.textContent = `Could not load the room: ${err instanceof Error ? err.message : err}`;
+  const needsWebGPU = err instanceof NeedsWebGPU;
+  loadingFailed(needsWebGPU ? err.message : `The room couldn’t load: ${err instanceof Error ? err.message : err}. Try reloading the page.`, needsWebGPU);
 });

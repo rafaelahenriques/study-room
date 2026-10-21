@@ -46,18 +46,38 @@ async function fetchWeather(): Promise<void> {
  */
 const GEOCODE = 'https://geocoding-api.open-meteo.com/v1/search';
 
-async function geocode(name: string) {
-  const res = await fetch(`${GEOCODE}?name=${encodeURIComponent(name)}&count=1&language=en&format=json`);
+export interface Place { name: string; detail: string; lat: number; lon: number }
+
+interface GeoHit { name: string; country?: string; admin1?: string; latitude: number; longitude: number }
+
+/** up to `count` places matching `name` (Open-Meteo geocoding) */
+export async function findCities(name: string, count = 5): Promise<Place[]> {
+  const res = await fetch(`${GEOCODE}?name=${encodeURIComponent(name)}&count=${count}&language=en&format=json`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const hit = (await res.json()).results?.[0];
+  const hits = ((await res.json()).results ?? []) as GeoHit[];
+  return hits.map((h) => ({
+    name: h.country ? `${h.name}, ${h.country}` : h.name,
+    detail: [h.admin1, h.country].filter(Boolean).join(', '),
+    lat: h.latitude,
+    lon: h.longitude,
+  }));
+}
+
+async function geocode(name: string) {
+  const hit = (await findCities(name, 1))[0];
   if (!hit) throw new Error(`"${name}" not found`);
-  return { name: hit.country ? `${hit.name}, ${hit.country}` : hit.name, lat: hit.latitude as number, lon: hit.longitude as number };
+  return hit;
 }
 
 let timer: number | undefined;
 
+/** use a place picked from findCities() */
+export function chooseCity(place: Place): void {
+  setLocation(place, 'search');
+}
+
 function setLocation(place: { name: string; lat: number; lon: number }, source: LocationSource) {
-  state.location = { ...place, source };
+  state.location = { name: place.name, lat: place.lat, lon: place.lon, source };
   state.weather.live = null;
   void fetchWeather();
   window.clearInterval(timer);
