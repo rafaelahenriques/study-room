@@ -7,6 +7,7 @@ import { Lighting } from './scene/lighting';
 import { createRainGlass } from './scene/rain';
 import { createOutsideView } from './scene/outside';
 import { createScreen } from './scene/screen';
+import { createCalendar } from './scene/calendar';
 import { createAmbient } from './scene/ambient';
 import { applyBakedAO } from './scene/bakedAO';
 import { createMusic } from './inputs/music';
@@ -91,6 +92,21 @@ async function main() {
   const outside = createOutsideView(room);
   const glass = createRainGlass(room.node<THREE.Mesh>('Window_Glass'), { dom: renderer.domElement, camera, controls });
   const monitor = createScreen(room);
+  const calendar = createCalendar(room, (v) => (lighting.dayDip = v));
+  // the globe on shelf 3: one full turn per click (exported clip ShelfBall_Spin)
+  const globeSpin = room.action('ShelfBall_Spin');
+  globeSpin.setLoop(THREE.LoopOnce, 1);
+  globeSpin.clampWhenFinished = false;                 // ends where it started: back to rest
+  const spinGlobe = () => {
+    if (!globeSpin.isRunning()) globeSpin.reset().play();
+  };
+  const nextDay = () => {
+    if (calendar.nextDay()) toast(`Calendar: ${calendar.label()}`);
+  };
+  const resetDate = () => {
+    calendar.resetDate();
+    toast(`Calendar: ${calendar.label()}`);
+  };
   const music = createMusic();
   const headphones = room.node('Headphones');
   let swingT = 0;
@@ -142,6 +158,9 @@ async function main() {
     knockBooks: () => withPhysics((p) => p.knockBooks()),
     tidyBooks: () => withPhysics((p) => p.tidyBooks()),
     physicsReady: () => physics !== null,
+    nextDay,
+    resetDate,
+    calendarLabel: () => calendar.label(),
   });
 
   const hints = createHints(room, camera, renderer.domElement);
@@ -184,6 +203,12 @@ async function main() {
         withPhysics((p) => p.knockBooks(shelf || undefined));
         break;
       }
+      case 'calendar':
+        nextDay();
+        break;
+      case 'ball':
+        spinGlobe();
+        break;
       case 'clock': {
         const h = currentHour();
         toast(`It's ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')} in the room`);
@@ -203,7 +228,7 @@ async function main() {
   hints.flash(7);
 
   const timer = new THREE.Timer();
-  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, get physics() { return physics; } } });
+  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, calendar, get physics() { return physics; } } });
   let prevAwake = false;
   let lastBooksFall = -Infinity;
   let statusTimer = 0;
@@ -247,7 +272,7 @@ async function main() {
     lighting.flash = glass.flash;
     lighting.update(dt, now);
     const L = lighting.levels;
-    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain, snow: w.condition === 'snow' ? 1 : 0, flash: glass.flash }, dt);
+    outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain, snow: w.snow, flash: glass.flash }, dt);
     monitor.update(dt, L.awake);
     ambient.update(dt, camera, { sun: L.day * (1 - Math.max(L.cloud, L.rain)) });
     music.update(dt);
@@ -257,9 +282,10 @@ async function main() {
     headphones.rotation.x += (swing - headphones.rotation.x) * Math.min(1, dt * 10);
     glass.update(dt, camera, {
       rain: w.rain,
-      fog: Math.min(1, w.rain * 1.6 + (w.condition === 'fog' ? 0.5 : 0) + (w.condition === 'snow' ? 0.12 : 0)),
+      fog: Math.min(1, w.rain * 1.6 + (w.condition === 'fog' ? 0.5 : 0) + 0.16 * w.snow),
       storm: w.condition === 'storm',
     });
+    calendar.update(dt);
     room.update(dt);
     physics?.update(dt);
     controls.update();
@@ -273,12 +299,15 @@ async function main() {
     }
   });
 
-  window.addEventListener('resize', () => {
+  const resize = () => {
     fitCamera();
     // the device pixel ratio can change too (window moved to another screen), same cap as at start
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+  };
+  window.addEventListener('resize', resize);
+  // a page opened in a hidden or zero-sized frame gets no resize event when it appears
+  new ResizeObserver(resize).observe(document.documentElement);
 }
 
 main().catch((err) => {

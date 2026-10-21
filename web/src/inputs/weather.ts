@@ -15,7 +15,7 @@ async function fetchWeather(): Promise<void> {
   const { lat, lon } = state.location;
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    '&current=weather_code,cloud_cover,precipitation,is_day,temperature_2m&timezone=auto';
+    '&current=weather_code,cloud_cover,precipitation,snowfall,is_day,temperature_2m&timezone=auto';
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -27,6 +27,8 @@ async function fetchWeather(): Promise<void> {
       condition,
       cloud: Math.max(preset.cloud * 0.5, (c.cloud_cover ?? 0) / 100),
       rain: condition === 'rain' || condition === 'storm' ? Math.min(1, 0.35 + (c.precipitation ?? 0) / 4) : 0,
+      // snowfall is cm/h; light snow still shows a few flakes
+      snow: condition === 'snow' ? Math.min(1, 0.35 + (c.snowfall ?? 0) / 2) : 0,
       isDay: c.is_day === 1,
       temperature: c.temperature_2m,
       utcOffsetSeconds: data.utc_offset_seconds ?? 0,

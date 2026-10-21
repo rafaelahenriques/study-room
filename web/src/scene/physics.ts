@@ -21,7 +21,7 @@ const STATIC_COLLIDERS = [
   'Room_FloorPlanks', 'Room_Walls', 'Rug', 'Desk_Top', 'Desk_Legs', 'Monitor_Riser', 'Monitor_Body',
   'Dresser_Body', 'Shelf_1', 'Shelf_2', 'Shelf_3', 'PaperBin', 'Pouf', 'Blanket', 'Window_Sill', 'Notepad',
   'Lamp_Base', 'PencilHolder', 'Mug', 'Keyboard', 'Chair_Base', 'Chair_Seat', 'Chair_Back', 'Easel_Frame',
-  'FloorPlant_Pot', 'Floor_Books', 'Calendar_Stand', 'HeadphoneStand_Base', 'Slippers', 'ArtStool',
+  'FloorPlant_Pot', 'Floor_Books', 'Calendar_Base', 'Plate', 'HeadphoneStand_Base', 'Slippers', 'ArtStool',
 ];
 const BOOK_NAME = /^Shelf_(\d)_Book_\d+$/;
 const MAX_PAPER = 10;

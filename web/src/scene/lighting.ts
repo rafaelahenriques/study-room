@@ -32,6 +32,9 @@ export class Lighting {
 
   /** lightning flash from the rain shader (0 … ~1) */
   flash = 0;
+  /** 0 … 1: the calendar's day-change dims the room towards night and back (not part of the weather) */
+  dayDip = 0;
+  private dayNatural = 1;
 
   /** eased 0–1 values other modules can read */
   readonly levels = { day: 1, awake: 0, rain: 0, cloud: 0 };
@@ -76,7 +79,8 @@ export class Lighting {
 
     // sun elevation: -1 at midnight, 0 at 6h/18h, 1 at noon
     const elev = Math.sin((Math.PI * (hour - 6)) / 12);
-    L.day = ease(L.day, smoothstep(-0.12, 0.3, elev), dt, 1.5);
+    this.dayNatural = ease(this.dayNatural, smoothstep(-0.12, 0.3, elev), dt, 1.5);
+    L.day = this.dayNatural * (1 - 0.85 * this.dayDip);
     L.rain = ease(L.rain, w.rain, dt, 1.0);
     L.cloud = ease(L.cloud, w.cloud, dt, 1.0);
     L.awake = ease(L.awake, isAwake(now) ? 1 : 0, dt, 2.0);

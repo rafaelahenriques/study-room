@@ -6,7 +6,8 @@
 //
 // Ported from GLSL to WGSL for this project (see README "Original shaders"):
 //  - mainImage → fn snowfall(...) -> vec4f, plain function for three.js' wgslFn
-//  - `amount` skips all the work while it isn't snowing
+//  - `amount` (0–1 snow intensity) skips all the work while it isn't snowing, and scales the
+//    share of cells that hold a flake (the original's fixed 8 %: 2–8 %)
 //  - the inner loop starts at i = 1: in the original, i = 0 divides by zero
 //    (5.0/float(i), 1.0/float(i)) and never produces a flake
 //  - the original's blue gradient and grain are dropped: the result is composited
@@ -38,7 +39,7 @@ fn snowfall(fragCoord: vec2f, iTime: f32, iResolution: vec2f, amount: f32) -> ve
       let d = 5.0 * distance((uvStep + vec2f(x * sin(y), y) * randomMagnitude1 + vec2f(y, x) * randomMagnitude2), uv);
 
       let omiVal = fract(sin(dot(uvStep, vec2f(32.4691, 94.615))) * 31572.1684);
-      if (omiVal < 0.08) {
+      if (omiVal < 0.08 * (0.25 + 0.75 * amount)) {
         let newd = (x + 1.0) * 0.4 * clamp(1.9 - d * (15.0 + (x * 6.3)) * (cellSize / 1.4), 0.0, 1.0);
         snow += newd;
       }

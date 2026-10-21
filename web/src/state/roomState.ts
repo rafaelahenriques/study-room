@@ -13,6 +13,8 @@ export interface WeatherLook {
   condition: Condition;
   /** 0–1 rain intensity */
   rain: number;
+  /** 0–1 snow intensity (how many flakes fall) */
+  snow: number;
   /** 0–1 cloud cover */
   cloud: number;
 }
@@ -25,12 +27,13 @@ export interface LiveWeather extends WeatherLook {
 }
 
 export const CONDITION_PRESETS: Record<Condition, WeatherLook> = {
-  clear: { condition: 'clear', rain: 0, cloud: 0.05 },
-  cloudy: { condition: 'cloudy', rain: 0, cloud: 0.8 },
-  fog: { condition: 'fog', rain: 0, cloud: 0.9 },
-  rain: { condition: 'rain', rain: 0.6, cloud: 0.9 },
-  storm: { condition: 'storm', rain: 1, cloud: 1 },
-  snow: { condition: 'snow', rain: 0, cloud: 0.85 },
+  // each preset sets both precipitation amounts, so switching never leaves the other one on
+  clear: { condition: 'clear', rain: 0, snow: 0, cloud: 0.05 },
+  cloudy: { condition: 'cloudy', rain: 0, snow: 0, cloud: 0.8 },
+  fog: { condition: 'fog', rain: 0, snow: 0, cloud: 0.9 },
+  rain: { condition: 'rain', rain: 0.6, snow: 0, cloud: 0.9 },
+  storm: { condition: 'storm', rain: 1, snow: 0, cloud: 1 },
+  snow: { condition: 'snow', rain: 0, snow: 0.7, cloud: 0.85 },
 };
 
 export type LocationSource = 'default' | 'time zone' | 'search' | 'device';
@@ -55,6 +58,8 @@ export const state = {
   sound: { mode: 'live' as Mode, manualLevel: 0, liveLevel: 0 },
   screen: { app: 'auto' as 'auto' | ScreenApp },
   music: { playing: false, title: '', artist: '', volume: 0.6, level: 0 },
+  /** date preview on the desk calendar: days after today (0 = today). Doesn't touch time or weather. */
+  calendar: { offsetDays: 0 },
 };
 
 /** Hour of day (0–24) at the room's location, or the manual hour. */

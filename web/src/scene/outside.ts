@@ -145,7 +145,7 @@ export interface OutsideInputs {
   day: number;      // 0 night … 1 day (eased)
   overcast: number; // 0 … 1 (eased)
   rain: number;     // 0 … 1 (eased)
-  /** 0 … 1 snowing (eased here) */
+  /** 0 … 1 snow intensity (eased here) */
   snow: number;
   /** lightning flash 0 … ~1 */
   flash?: number;
@@ -201,7 +201,8 @@ export function createOutsideView(room: Room) {
   const snowFragCoord = vec2(st.x, float(1).sub(st.y)).mul(iResolution).mul(0.85);
   const snow = snowfall({ fragCoord: snowFragCoord, iTime: time, iResolution, amount: u.snow }) as unknown as Node<'vec4'>;
   const flakes = clamp(snow.x.mul(1.8), 0, 1);
-  col = mix(col, vec3(u.flake), flakes.mul(u.snow));
+  // flakes fade in with the first bit of intensity; more intensity = more flakes (in the WGSL)
+  col = mix(col, vec3(u.flake), flakes.mul(clamp(u.snow.mul(4), 0, 1)));
 
   const material = new THREE.MeshBasicNodeMaterial();
   material.name = 'M_WindowSky_Outside';
@@ -219,6 +220,8 @@ export function createOutsideView(room: Room) {
 
   let snowEased = 0;
   return {
+    /** eased snow intensity currently drawn (0 … 1) */
+    get snow() { return snowEased; },
     update(i: OutsideInputs, dt: number) {
       const elev = Math.sin((Math.PI * (i.hour - 6)) / 12);
       const dawn = (1 - smoothstepJS(0.0, 0.35, Math.abs(elev))) * Math.min(1, i.day * 2);

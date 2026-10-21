@@ -54,7 +54,8 @@ export class Room {
     return this.node(name).getWorldPosition(target);
   }
 
-  private action(name: string): THREE.AnimationAction {
+  /** the mixer action for a clip (one per clip; reused on every call) */
+  action(name: string): THREE.AnimationAction {
     const clip = THREE.AnimationClip.findByName(this.clips, name);
     if (!clip) throw new Error(`Clip "${name}" not found in GLB`);
     return this.mixer.clipAction(clip);

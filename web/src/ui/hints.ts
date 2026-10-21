@@ -22,6 +22,8 @@ const ACTIONS: Record<string, () => string> = {
   drawer: () => 'Open or close the drawer',
   clock: () => 'Check the room’s time',
   bin: () => 'Paper bin (throw from the notepad)',
+  calendar: () => 'Next day (date preview)',
+  ball: () => 'Spin the globe',
 };
 export const isClickable = (kind: string) => kind in ACTIONS;
 
@@ -37,6 +39,8 @@ const HOTSPOTS: { node: string; kind: string; label: string; left?: boolean }[] 
   { node: 'Shelf_2', kind: 'shelf', label: 'Books', left: true },
   { node: 'Drawer_2', kind: 'drawer', label: 'Drawers', left: true },
   { node: 'Clock_Body', kind: 'clock', label: 'Clock' },
+  { node: 'Calendar_Root', kind: 'calendar', label: 'Next day' },
+  { node: 'ShelfBall_Root', kind: 'ball', label: 'Spin', left: true },
 ];
 
 export function createHints(room: Room, camera: THREE.Camera, dom: HTMLElement) {

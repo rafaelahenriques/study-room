@@ -36,6 +36,7 @@ Two Shadertoy shaders are ported from GLSL to **WGSL**, the way it's done in cla
 - **Where it runs:** drawn on the view outside the window, over the procedural sky. The rain glass then refracts it.
 - **Dropped:** the original's own blue gradient and grain.
 - **Loop start:** the inner loop starts at `i = 1`, because the original's `i = 0` divides by zero and never draws a flake.
+- **Intensity:** `amount` (0–1) scales the share of cells that hold a flake, from 2 % to the original's 8 %, so light snow has fewer flakes, not just fainter ones.
 - **Weather:** it only runs when the weather is snowy. Then the hills and roofs turn white, and the glass gets a light fog.
 
 ## Layout
@@ -43,13 +44,11 @@ Two Shadertoy shaders are ported from GLSL to **WGSL**, the way it's done in cla
 ```
 webgl/
 ├── blender/                      3D source + pipeline
-│   ├── isometricroom.blend          original scene (source of truth, never modified by scripts)
-│   ├── isometricroom_enriched.blend generated: props, materials, animations, anchors
-│   ├── build_enriched_room.py       original → enriched
-│   ├── add_props.py                 adds the paper bin + notepad, splits the shelf books (for physics)
+│   ├── isometricroom.blend          your original scene, untouched
+│   ├── isometricroom_enriched.blend the working scene: props, materials, animations, anchors (edit this one)
 │   ├── bake_ao.py                   bakes ambient occlusion → web/public/textures/room_ao.jpg
 │   ├── export_glb.py                enriched → web/public/models/study_room.glb
-│   ├── render_preview.py            EEVEE look-dev renders → blender/previews/
+│   ├── previews/                    look-dev renders used in this README
 │   └── SCENE_NOTES.md               every node, anchor, clip and material the website uses
 ├── web/                          the website (Vite + TypeScript + Three.js WebGPURenderer)
 │   ├── public/models/study_room.glb
@@ -92,16 +91,15 @@ Open http://localhost:5173. The site needs **WebGPU**: recent Chrome or Edge, Sa
 
 ## Update the 3D model
 
+Edit `blender/isometricroom_enriched.blend` in Blender and save it. Then, after changing the room, re-bake the ambient occlusion and export:
+
 ```bash
 cd blender
-# only to regenerate the enriched file from the original (overwrites manual edits in it):
-/Applications/Blender.app/Contents/MacOS/Blender -b isometricroom.blend --factory-startup -P build_enriched_room.py
-# once (already done): bin + notepad, one object per shelf book
-/Applications/Blender.app/Contents/MacOS/Blender -b isometricroom_enriched.blend -P add_props.py
-# after changing the room: re-bake the ambient occlusion, then export
 /Applications/Blender.app/Contents/MacOS/Blender -b isometricroom_enriched.blend -P bake_ao.py
 /Applications/Blender.app/Contents/MacOS/Blender -b isometricroom_enriched.blend -P export_glb.py
 ```
+
+New objects must be inside a collection under `StudyRoom` to be exported.
 
 The bake takes about a minute on the GPU. The export writes straight into `web/public/models/`. If the dev server is running, just reload the page. Node names stay stable, so the website code keeps working.
 
@@ -112,6 +110,8 @@ The bake takes about a minute on the GPU. The export writes straight into `web/p
 | **Notepad** on the monitor riser | Crumples a paper ball and throws it at the bin across the room (physics). Each basket shows "Score!". |
 | **Shelf or book** | Knocks that shelf's books off (physics). Panel → Physics → *tidy the books* puts them back. A very loud sound from the sound sensor knocks them over too. |
 | **Chair** | Spins once on its swivel. |
+| **Calendar** (on the dresser) | Next day: the page flips over the top and the room dims towards night and back. A date preview only; it never changes the weather or the time. Panel → Room → *Reset date* returns to today. |
+| **Globe** (shelf 3) | One full spin (2 s). Clicks during a spin are ignored. |
 | **Not sure what's clickable?** | Hover for a label and a glow, or press *What can I click?* (bottom left) to show every hotspot. They also appear for a few seconds after loading. |
 | **Window** (hold and drag) | Heartfelt's `iMouse`: up and down = amount of rain while you hold, left and right = drop time (stays where you leave it). On release the rain goes back to the weather, as on Shadertoy. |
 | **Lamp, monitor, headphones, drawers** | Lamp on or off, switch screen app, lo-fi music (Audius), open or close the drawers. |
@@ -124,7 +124,7 @@ Every input writes into `state` ([`roomState.ts`](web/src/state/roomState.ts)); 
 | Property | Live source | Manual | Back to live |
 |---|---|---|---|
 | Time of day | the location's clock (Open-Meteo UTC offset), else this device's clock | *Pick a time* + hour slider | *Live* or *Back to live* |
-| Weather | Open-Meteo, every 15 min. If it fails, the room shows clear skies and the panel says so | a condition chip (the rain slider appears for rain and storm) | same |
+| Weather | Open-Meteo, every 15 min (rain amount from precipitation, snow amount from snowfall). If it fails, the room shows clear skies and the panel says so | a condition chip; one slider sets the rain amount (rain, storm) or the snow amount (snow) | same |
 | Sound level | ESP32 microphone over MQTT. 0 when no sensor is connected | *Set by hand* + level slider | same |
 | Room awake | any of: motion in the last 60 s (sensor, *simulate motion*, clicking the monitor, starting music), sensor reporting motion, music playing, *keep room awake* / lamp | — | *back to live* clears *keep room awake* |
 

@@ -14,6 +14,9 @@ export interface PanelActions {
   knockBooks(): void;
   tidyBooks(): void;
   physicsReady(): boolean;
+  nextDay(): void;
+  resetDate(): void;
+  calendarLabel(): string;
 }
 
 /**
@@ -24,7 +27,7 @@ export interface PanelActions {
  */
 
 const CONDITIONS: Condition[] = ['clear', 'cloudy', 'fog', 'rain', 'storm', 'snow'];
-const RAINY = new Set<Condition>(['rain', 'storm']);
+const RAINY = new Set<Condition>(['rain', 'storm']);   // these show a rain-intensity slider, snow shows a snow one
 
 const hhmm = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -72,7 +75,7 @@ const HTML = `
         ${CONDITIONS.map((c) => `<button type="button" data-weather="${c}">${cap(c)}</button>`).join('')}
       </div>
       <div class="ctl-row" id="rain-row" hidden>
-        <label for="rain-range">Rain</label>
+        <label for="rain-range" id="precip-label">Rain</label>
         <input type="range" id="rain-range" min="0.1" max="1" step="0.01">
         <output id="rain-out" for="rain-range"></output>
       </div>
@@ -93,6 +96,14 @@ const HTML = `
   </div>
 
   <div class="ctl-pane" id="pane-room" role="tabpanel" aria-labelledby="tab-room" hidden>
+    <div class="ctl-field">
+      <span class="ctl-label">Calendar</span>
+      <div class="chips">
+        <button type="button" id="day-btn">Next day</button>
+        <button type="button" id="today-btn">Reset date</button>
+      </div>
+      <p class="ctl-hint" id="cal-status"></p>
+    </div>
     <div class="ctl-field">
       <span class="ctl-label">Lamp</span>
       <div class="chips"><button type="button" id="lamp-btn">Keep the lamp on</button></div>
@@ -303,7 +314,9 @@ export function createPanel(actions: PanelActions) {
     });
   }
   rainRange.addEventListener('input', () => {
-    state.weather.manual.rain = Number(rainRange.value);
+    // one slider: rain amount for rain/storm, snow amount for snow
+    if (state.weather.manual.condition === 'snow') state.weather.manual.snow = Number(rainRange.value);
+    else state.weather.manual.rain = Number(rainRange.value);
     refreshNow();
   });
 
@@ -323,6 +336,8 @@ export function createPanel(actions: PanelActions) {
   });
 
   // ---- room
+  $('#day-btn').addEventListener('click', () => { actions.nextDay(); refreshNow(); });
+  $('#today-btn').addEventListener('click', () => { actions.resetDate(); refreshNow(); });
   $('#lamp-btn').addEventListener('click', () => {
     state.motion.keepAwake = !state.motion.keepAwake;
     if (!state.motion.keepAwake) state.motion.lastMotion = Number.NEGATIVE_INFINITY;
@@ -396,11 +411,14 @@ export function createPanel(actions: PanelActions) {
       const w = b.dataset.weather;
       press(b, w === 'live' ? !manualW : manualW && state.weather.manual.condition === w);
     }
-    const rainy = manualW && RAINY.has(state.weather.manual.condition);
-    $('#rain-row').hidden = !rainy;
-    if (rainy) {
-      setRange(rainRange, state.weather.manual.rain);
-      $('#rain-out').textContent = `${Math.round(state.weather.manual.rain * 100)}%`;
+    const cond = state.weather.manual.condition;
+    const precip = manualW && (RAINY.has(cond) || cond === 'snow');
+    $('#rain-row').hidden = !precip;
+    if (precip) {
+      const amount = cond === 'snow' ? state.weather.manual.snow : state.weather.manual.rain;
+      $('#precip-label').textContent = cond === 'snow' ? 'Snow' : 'Rain';
+      setRange(rainRange, amount);
+      $('#rain-out').textContent = `${Math.round(amount * 100)}%`;
     }
     $('#w-status').textContent = manualW
       ? (live ? `Live now: ${live.condition}, ${Math.round(live.temperature)}°C` : 'Set by hand')
@@ -415,6 +433,8 @@ export function createPanel(actions: PanelActions) {
       $('#time-out').textContent = hhmm(state.time.manualHour);
     }
 
+    $('#cal-status').textContent = actions.calendarLabel();
+    ($('#today-btn') as HTMLButtonElement).disabled = state.calendar.offsetDays === 0;
     press($('#lamp-btn'), state.motion.keepAwake);
     for (const b of $$('[data-screen]')) press(b, b.dataset.screen === state.screen.app);
     $('#music-btn').textContent = state.music.playing ? 'Pause' : 'Play';

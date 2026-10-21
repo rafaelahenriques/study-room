@@ -200,7 +200,7 @@ export function createScreen(room: Room) {
     ctx.fillText(wv.condition, x + 300, y + 244);
     ctx.font = font(18, 500);
     ctx.fillStyle = '#7a6f66';
-    ctx.fillText(`rain on the window ${Math.round(wv.rain * 100)}% · clouds ${Math.round(wv.cloud * 100)}%`, x + 300, y + 280);
+    ctx.fillText(`${wv.snow > 0 ? `snow ${Math.round(wv.snow * 100)}%` : `rain on the window ${Math.round(wv.rain * 100)}%`} · clouds ${Math.round(wv.cloud * 100)}%`, x + 300, y + 280);
     ctx.fillText(state.weather.mode === 'manual' ? 'manual weather' : live ? `live · ${state.location.name}` : 'loading…', x + 300, y + 306);
   }
 

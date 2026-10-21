@@ -4,7 +4,7 @@ Bakes ambient occlusion for the static parts of the room into one texture atlas.
   cd blender
   /Applications/Blender.app/Contents/MacOS/Blender -b isometricroom_enriched.blend -P bake_ao.py
 
-Pipeline: (build_enriched_room.py) → bake_ao.py → export_glb.py
+Pipeline: edit isometricroom_enriched.blend → bake_ao.py → export_glb.py
 
 What it does:
   1. applies the modifiers of the static objects (the bake needs the final geometry),
