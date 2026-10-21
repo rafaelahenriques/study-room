@@ -61,6 +61,8 @@ export const state = {
   music: { playing: false, title: '', artist: '', volume: 0.6, level: 0 },
   /** date preview on the desk calendar: days after today (0 = today). Doesn't touch time or weather. */
   calendar: { offsetDays: 0 },
+  /** the coffee mug: spilled after a tap, until Clean up */
+  mug: { spilled: false },
 };
 
 /** Hour of day (0–24) at the room's location, or the manual hour. */

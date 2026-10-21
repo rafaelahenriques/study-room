@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { float, materialEmissive, positionLocal, sin, time } from 'three/tsl';
 import type { Room } from './room';
+import { mugRim } from './mugRim';
 
 /**
  * Small ambient animations that make the room feel alive:
@@ -42,6 +43,8 @@ const particles = (count: number, map: THREE.Texture) => {
 export interface AmbientInputs {
   /** 0 … 1 strength of direct sunlight through the window */
   sun: number;
+  /** false while the mug is spilled */
+  steam: boolean;
 }
 
 export const createAmbient = (scene: THREE.Scene, room: Room) => {
@@ -53,7 +56,7 @@ export const createAmbient = (scene: THREE.Scene, room: Room) => {
   const STEAM = 12;
   const STEAM_LIFE = 3.4;
   const steam = particles(STEAM, dot);
-  const mug = room.worldPosition('Anchor_MugSteam');
+  const mug = mugRim(room.node<THREE.Mesh>('Mug')).centre;
   const steamSeeds = Array.from({ length: STEAM }, (_, i) => ({ offset: (i / STEAM) * STEAM_LIFE, phase: Math.random() * 6.28 }));
   scene.add(steam);
 
@@ -97,6 +100,7 @@ export const createAmbient = (scene: THREE.Scene, room: Room) => {
       t += dt;
       sunEased += (i.sun - sunEased) * Math.min(1, dt * 0.8);
 
+      steam.visible = i.steam;
       for (let k = 0; k < STEAM; k++) {
         const seed = steamSeeds[k];
         const a = ((t + seed.offset) % STEAM_LIFE) / STEAM_LIFE; // 0 → 1 over its life

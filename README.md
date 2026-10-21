@@ -18,14 +18,14 @@ An interactive isometric study room for the web, built with Three.js and WebGPU.
 | Online | https://studywebgl.netlify.app/ (Netlify builds every push to `main`) |
 | **Extra:** interaction beyond looking around | Window drag, calendar, globe, easel doodles, lamp, drawers, chair, music, physics, control panel |
 | **Extra:** physics | Rapier: paper balls into the bin, books knocked off the shelves |
-| **Extra:** multiple shaders | A second port, snow (Shadertoy Mdt3Df), plus TSL node materials for the outside view and the twinkling lights |
+| **Extra:** multiple shaders | Two more ports: snow (Shadertoy Mdt3Df) and the spilled coffee's ripples (Shadertoy wdtyDH, two passes), plus TSL node materials for the outside view and the twinkling lights |
 | **Extra:** additional libraries | Rapier (WebAssembly physics), MQTT.js (sensor) |
 | **Extra:** own Blender model, with baking | The whole room is modelled in Blender. Ambient occlusion is baked with Cycles into `web/public/textures/room_ao.jpg` |
 | **Extra:** Blender animations controlled from code | 10 clips via `AnimationMixer`: lamp wake, drawers, chair, curtains, plants, sound bump, calendar flip, globe spin |
 
 ## Original shaders
 
-Two Shadertoy shaders are ported from GLSL to **WGSL**, the way it's done in class: each port is a plain WGSL function in a `.wgsl` file, imported with `?raw`, turned into a node with `wgslFn()` and used as a `MeshBasicNodeMaterial`'s `colorNode`. The Shadertoy inputs (`fragCoord`, `iTime`, `iMouse`, `iResolution`, `iChannel0` + `iChannel0Sampler`) are passed in as TSL `uniform()` nodes.
+Three Shadertoy shaders are ported from GLSL to **WGSL**, the way it's done in class: each port is a plain WGSL function in a `.wgsl` file, imported with `?raw`, turned into a node with `wgslFn()` and used as a `MeshBasicNodeMaterial`'s `colorNode`. The Shadertoy inputs (`fragCoord`, `iTime`, `iMouse`, `iResolution`, `iChannel0` + `iChannel0Sampler`) are passed in as TSL `uniform()` nodes.
 
 ### Rain on the window
 
@@ -56,12 +56,26 @@ Two Shadertoy shaders are ported from GLSL to **WGSL**, the way it's done in cla
 - **Intensity:** `amount` (0–1) scales the share of cells that hold a flake, from 2 % to the original's 8 %, so light snow has fewer flakes, not just fainter ones.
 - **Weather:** it only runs when the weather is snowy. Then the hills and roofs turn white, and the glass gets a light fog.
 
+### Spilled coffee
+
+- **Simple Water Ripple Effect** by Polygon, 2020 — **https://www.shadertoy.com/view/wdtyDH**
+- License: Shadertoy's default, [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/). The WGSL ports in [`web/src/shaders/ripple/buffer.wgsl`](web/src/shaders/ripple/buffer.wgsl) (Buffer A) and [`fragment.wgsl`](web/src/shaders/ripple/fragment.wgsl) (Image) are shared under the same license. They're hooked up in [`web/src/scene/coffee.ts`](web/src/scene/coffee.ts).
+
+**How it's set up:** like the course's plasma project. *Buffer A* (the wave simulation) renders into a render target, and the *Image* pass reads it as `iChannel0`. This Buffer A also reads its own previous frame, so two render targets swap after every step.
+
+**What changed:**
+- **Where it runs:** on the puddle when you tip the mug over. The splash, and any loud noise afterwards, is its `iMouse` drop.
+- **Coordinates:** `texelFetch` → `textureLoad` with clamped coordinates. `fragCoord` is the pixel position, which starts at the top left in WebGPU like the texture rows, so nothing is flipped. The edge tests `== 0.5` become `< 1.0`.
+- **Size:** a 128² simulation stepped at 60 Hz, as the original runs. The refraction and glint are scaled up (`strength`), because the puddle is much smaller on screen than a full Shadertoy canvas.
+- **iChannel1:** one solid coffee colour instead of an image, so the ripples show through the glints.
+
 ## Interaction
 
 | Click / control | What happens |
 |---|---|
 | **Window** (hold and drag) | Heartfelt's `iMouse`: up and down = amount of rain while you hold, left and right = drop time (stays where you leave it). On release the rain goes back to the weather, as on Shadertoy. |
 | **Not sure what's clickable?** | Hover for a label and a glow, or press *What can I click?* (bottom left) to show every hotspot. They also appear for a few seconds after loading. |
+| **Mug** | Tips over and spills the coffee into a puddle with ripples (the wdtyDH port). *Clean up the coffee* sets the mug back. |
 | **Lamp** | Turns the room's lamp off when it's on (and on when it's off). It stays on while music plays or the sensor sees motion. |
 | **Calendar** (on the dresser) | Shows today's date in the room's city, like the room clock (so Honolulu can still be on yesterday). Next day: the page flips over the top and the light swings through a day change (by day it goes dark and back, at night it brightens to daylight and back). A date preview only; it never changes the weather or the time. Panel → Room → *Reset date* returns to today. |
 | **Globe** (shelf 3) | One full spin (2 s). Clicks during a spin are ignored. |
@@ -164,7 +178,8 @@ An ESP32 with a PIR motion sensor and an optional microphone publishes over MQTT
 
 - **Rain:** Heartfelt by Martijn Steinrucken (BigWings), https://www.shadertoy.com/view/ltffzl, CC BY-NC-SA 3.0.
 - **Snow:** Shadertoy Mdt3Df, https://www.shadertoy.com/view/Mdt3Df, CC BY-NC-SA 3.0 (Shadertoy's default licence).
-- Both WGSL ports are shared under the same licence.
+- **Coffee ripples:** Simple Water Ripple Effect by Polygon, https://www.shadertoy.com/view/wdtyDH, CC BY-NC-SA 3.0 (Shadertoy's default licence).
+- The WGSL ports are shared under the same licence.
 - Weather: [Open-Meteo](https://open-meteo.com/). Music: [Audius](https://audius.co). Physics: [Rapier](https://rapier.rs). Rendering: [three.js](https://threejs.org).
 
 Rafaela Henriques · Creative Development, Howest · 2026

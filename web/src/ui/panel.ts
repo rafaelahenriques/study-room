@@ -18,6 +18,7 @@ export interface PanelActions {
   nextDay(): void;
   resetDate(): void;
   calendarLabel(): string;
+  cleanUp(): void;
 }
 
 /**
@@ -135,6 +136,7 @@ const HTML = `
         <button type="button" id="toss-btn" data-physics>Throw paper</button>
         <button type="button" id="knock-btn" data-physics>Knock books</button>
         <button type="button" id="tidy-btn" data-physics>Tidy books</button>
+        <button type="button" id="panel-cleanup-btn" hidden>Clean up coffee</button>
       </div>
       <p class="ctl-hint" id="physics-status" hidden>Physics is loading…</p>
     </div>
@@ -356,6 +358,7 @@ export const createPanel = (actions: PanelActions) => {
   $('#toss-btn').addEventListener('click', () => actions.tossPaper());
   $('#knock-btn').addEventListener('click', () => actions.knockBooks());
   $('#tidy-btn').addEventListener('click', () => actions.tidyBooks());
+  $('#panel-cleanup-btn').addEventListener('click', () => actions.cleanUp());
 
   // ---- sensors
   $('#motion-btn').addEventListener('click', () => {
@@ -434,6 +437,7 @@ export const createPanel = (actions: PanelActions) => {
     setRange(volRange, state.music.volume);
     $('#vol-out').textContent = `${Math.round(state.music.volume * 100)}%`;
 
+    $('#panel-cleanup-btn').hidden = !state.mug.spilled;
     const ready = actions.physicsReady();
     for (const b of $$<HTMLButtonElement>('[data-physics]')) b.disabled = !ready;
     $('#physics-status').hidden = ready;

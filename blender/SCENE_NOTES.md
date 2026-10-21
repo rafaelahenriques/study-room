@@ -35,7 +35,8 @@ Nodes with `userData.interactive` (glTF extras):
 | Desk lamp | `Lamp` → `Lamp_Base` → `Lamp_ArmLower` → `Lamp_ArmUpper` → `Lamp_Head` → `Lamp_Bulb` | `M_LampBulb` is emissive. Put a SpotLight at `Anchor_LampLight` aimed at `Anchor_LampTarget`. Both are children of `Lamp_Head`, so they follow the animation. |
 | Night ambience | `StringLights_Bulbs` | One mesh using `M_StringLightBulb` (emissive). The bulbs hang on hooks about 5 cm off the wall. Fade them in at night. |
 | Clock | `Clock_HandHour`, `Clock_HandMinute` | Set `rotation.z` to the clockwise angle in radians (0 = 12 o'clock). The default is 10:10. |
-| Mug steam | `Anchor_MugSteam` | Rim centre, for a particle or sprite effect. |
+| Mug and coffee | `Mug` (tag `mug`) | Tap to spill: the website tips it over its bottom edge and draws the coffee (in the cup and as a puddle) at runtime, sized from the mug's rim. |
+| Mug steam | `Mug` | The website starts the steam at the centre of the mug's rim, found from its geometry. `Anchor_MugSteam` is out of date (the mug was moved later) and isn't used. |
 | Screen glow | `Anchor_ScreenLight` | In front of the screen centre, for a RectAreaLight or PointLight. |
 | Physics props | `PaperBin` (floor, far side of the room), `Notepad` (monitor riser), `Shelf_1_Book_01` … `Shelf_3_Book_06` (one node per book, origin at its centre) | The website turns the books into Rapier bodies and throws paper from the notepad into the bin. |
 | Drawers | `Dresser` → `Drawer_1` (top) … `Drawer_3` | Each drawer is its own node with a real drawer box inside. The drawers slide toward the room. |

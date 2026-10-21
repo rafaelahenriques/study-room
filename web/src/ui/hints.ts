@@ -25,6 +25,7 @@ const ACTIONS: Record<string, () => string> = {
   calendar: () => 'Next day (date preview)',
   ball: () => 'Spin the globe',
   easel: () => 'Doodle on the canvas',
+  mug: () => (state.mug.spilled ? 'Press Clean up to set it back' : 'Spill the coffee'),
 };
 export const isClickable = (kind: string) => kind in ACTIONS;
 
@@ -43,6 +44,7 @@ const HOTSPOTS: { node: string; kind: string; label: string; left?: boolean }[] 
   { node: 'Calendar_Root', kind: 'calendar', label: 'Next day' },
   { node: 'ShelfBall_Root', kind: 'ball', label: 'Spin', left: true },
   { node: 'Easel_Painting', kind: 'easel', label: 'Doodle' },
+  { node: 'Mug', kind: 'mug', label: 'Coffee' },
 ];
 
 export const createHints = (room: Room, camera: THREE.Camera, dom: HTMLElement) => {

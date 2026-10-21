@@ -9,6 +9,7 @@ import { createOutsideView } from './scene/outside';
 import { createScreen } from './scene/screen';
 import { createCalendar } from './scene/calendar';
 import { createEasel } from './scene/easel';
+import { createCoffee } from './scene/coffee';
 import { createAmbient } from './scene/ambient';
 import { applyBakedAO } from './scene/bakedAO';
 import { createMusic } from './inputs/music';
@@ -94,6 +95,12 @@ const main = async () => {
   const glass = createRainGlass(room.node<THREE.Mesh>('Window_Glass'), { dom: renderer.domElement, camera, controls });
   const monitor = createScreen(room);
   const calendar = createCalendar(room, (v) => (lighting.dayDip = v));
+  // tap the mug to spill it: the puddle is Shadertoy wdtyDH (Buffer A + Image)
+  const coffee = createCoffee(scene, room, renderer);
+  const cleanUp = () => {
+    if (coffee.cleanUp()) toast('All clean');
+  };
+  document.getElementById('cleanup-btn')?.addEventListener('click', cleanUp);
   // the globe on shelf 3: one full turn per click (exported clip ShelfBall_Spin)
   const globeSpin = room.action('ShelfBall_Spin');
   globeSpin.setLoop(THREE.LoopOnce, 1);
@@ -129,6 +136,7 @@ const main = async () => {
     if (now - lastBump < config.soundBumpCooldownSeconds * 1000) return;
     lastBump = now;
     room.trigger('Sound_Bump');
+    coffee.poke();                                      // a bump ripples spilled coffee
   };
 
   // physics (Rapier) loads in the background; until then the physics actions just say so
@@ -166,6 +174,7 @@ const main = async () => {
     physicsReady: () => physics !== null,
     nextDay,
     resetDate,
+    cleanUp,
     calendarLabel: () => calendar.label(),
   });
 
@@ -176,6 +185,9 @@ const main = async () => {
     switch (kind) {
       case 'easel':
         easel.enter();
+        break;
+      case 'mug':
+        toast(coffee.spill() ? 'Oops! Coffee everywhere' : 'Press Clean up to set the mug back');
         break;
       case 'lamp':
       case 'lamp_switch':
@@ -246,7 +258,7 @@ const main = async () => {
   hints.flash(7);
 
   const timer = new THREE.Timer();
-  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, calendar, easel, get physics() { return physics; } } });
+  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, calendar, easel, coffee, get physics() { return physics; } } });
   let prevAwake = false;
   let lastBooksFall = -Infinity;
   let statusTimer = 0;
@@ -292,7 +304,7 @@ const main = async () => {
     const L = lighting.levels;
     outside.update({ hour: h, day: L.day, overcast: Math.max(L.cloud, L.rain), rain: L.rain, snow: w.snow, flash: glass.flash }, dt);
     monitor.update(dt, L.awake);
-    ambient.update(dt, camera, { sun: L.day * (1 - Math.max(L.cloud, L.rain)) });
+    ambient.update(dt, camera, { sun: L.day * (1 - Math.max(L.cloud, L.rain)), steam: !state.mug.spilled });
     music.update(dt);
     // headphones sway on the stand with the music (Sound_Bump overrides this while it plays)
     swingT += dt;
@@ -306,6 +318,7 @@ const main = async () => {
     calendar.update(dt);
     room.update(dt);
     physics?.update(dt);
+    coffee.update(dt, 0.3 + 0.7 * Math.max(L.day * (1 - 0.6 * Math.max(L.cloud, L.rain)), 0.75 * L.awake));
     easel.update(dt);
     if (!easel.active) controls.update();              // the easel flies the camera itself
     renderer.render(scene, camera);
