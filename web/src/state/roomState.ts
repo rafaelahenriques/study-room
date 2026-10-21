@@ -75,6 +75,18 @@ export const currentHour = (): number => {
   return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
 };
 
+/** Today's date at the room's location (midday, local Date), like the room clock; this device's date until the weather loads. */
+export const locationToday = (): Date => {
+  const live = state.weather.live;
+  if (!live) {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    return d;
+  }
+  const there = new Date(Date.now() + live.utcOffsetSeconds * 1000);   // read with the UTC getters
+  return new Date(there.getUTCFullYear(), there.getUTCMonth(), there.getUTCDate(), 12);
+};
+
 export const currentWeather = (): WeatherLook => {
   const { mode, manual, live } = state.weather;
   return mode === 'manual' || !live ? manual : live;

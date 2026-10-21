@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import type { Room } from './room';
-import { state } from '../state/roomState';
+import { locationToday, state } from '../state/roomState';
 
 /**
  * The flip calendar on the dresser: a date preview, not a forecast.
@@ -21,10 +21,9 @@ const DIP_SECONDS = 1.8;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-/** today's local date plus `offset` days (Date handles month and year boundaries) */
+/** today at the room's location plus `offset` days (Date handles month and year boundaries) */
 const previewDate = (offset = state.calendar.offsetDays): Date => {
-  const d = new Date();
-  d.setHours(12, 0, 0, 0); // midday: no daylight-saving edge cases
+  const d = locationToday();   // midday: no daylight-saving edge cases
   d.setDate(d.getDate() + offset);
   return d;
 };
@@ -85,7 +84,13 @@ export const createCalendar = (room: Room, setDayDip: (v: number) => void) => {
   let flipping = false;
   let dipT = -1;            // seconds into the day-change dip (-1 = none)
   let dip = 0;
-  const show = (d: Date) => { page.draw(d); surface.draw(d); };
+  let shown = '';
+  let checkT = 0;
+  const show = (d: Date) => {
+    page.draw(d);
+    surface.draw(d);
+    shown = d.toDateString();
+  };
   show(previewDate());
 
   const settle = () => {
@@ -123,6 +128,13 @@ export const createCalendar = (room: Room, setDayDip: (v: number) => void) => {
 
     /** call every frame (before the mixer update) */
     update(dt: number) {
+      // follow the room's date: another city's time zone, or midnight passing
+      checkT += dt;
+      if (!flipping && checkT > 0.5) {
+        checkT = 0;
+        const d = previewDate();
+        if (d.toDateString() !== shown) show(d);
+      }
       if (flipping) {
         const k = flip.time / flipSeconds;                // fade the page as it goes over the top
         const fade = THREE.MathUtils.smoothstep(k, 0.55, 0.95);
@@ -143,7 +155,7 @@ export const createCalendar = (room: Room, setDayDip: (v: number) => void) => {
     label(): string {
       const d = previewDate();
       const n = state.calendar.offsetDays;
-      const text = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined });
+      const text = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() !== locationToday().getFullYear() ? 'numeric' : undefined });
       return n === 0 ? `${text} (today)` : `${text} (+${n} day${n === 1 ? '' : 's'}, preview)`;
     },
   };
