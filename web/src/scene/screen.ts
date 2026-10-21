@@ -11,7 +11,7 @@ import { currentHour, currentWeather, state, type Condition, type ScreenApp } fr
  * so the canvas maps 1:1 with flipY = false.
  */
 
-export const SCREEN_APPS: ScreenApp[] = ['code', 'weather'];
+const SCREEN_APPS: ScreenApp[] = ['code', 'weather'];
 
 const W = 1024;
 const H = 516; // screen quad is 61.7 × 31.1 cm
@@ -46,7 +46,7 @@ fn heartfelt(fragCoord: vec2f, iTime: f32, iMouse: vec4f, ...) -> vec4f {
 
 const KEYWORDS = /\b(fn|let|var|return|select|vec2f|vec3f|vec4f|f32)\b/g;
 
-export function createScreen(room: Room) {
+export const createScreen = (room: Room) => {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -70,7 +70,7 @@ export function createScreen(room: Room) {
   const font = (size: number, weight = 500, mono = false) =>
     `${weight} ${size}px ${mono ? 'ui-monospace, "SF Mono", Menlo, monospace' : 'ui-rounded, "SF Pro Rounded", system-ui, sans-serif'}`;
 
-  function wallpaper() {
+  const wallpaper = () => {
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#e9c9a8');
     g.addColorStop(0.55, '#e8d9c2');
@@ -89,9 +89,9 @@ export function createScreen(room: Room) {
     for (let x = 0; x <= W; x += 16) ctx.lineTo(x, H * 0.84 + Math.sin(x * 0.009 + 4) * 18);
     ctx.lineTo(W, H);
     ctx.fill();
-  }
+  };
 
-  function topBar() {
+  const topBar = () => {
     ctx.fillStyle = 'rgba(59,54,51,0.82)';
     ctx.fillRect(0, 0, W, 34);
     ctx.fillStyle = CREAM;
@@ -112,9 +112,9 @@ export function createScreen(room: Room) {
     const temp = live ? `${Math.round(live.temperature)}°  ` : '';
     ctx.textAlign = 'right';
     ctx.fillText(`${temp}${weatherGlyph(currentWeather().condition, h)}   ${time}`, W - 16, 17);
-  }
+  };
 
-  function windowFrame(title: string, x: number, y: number, w: number, h: number, dark = false) {
+  const windowFrame = (title: string, x: number, y: number, w: number, h: number, dark = false) => {
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.beginPath();
     ctx.roundRect(x + 6, y + 10, w, h, 14);
@@ -138,9 +138,9 @@ export function createScreen(room: Room) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(title, x + w / 2, y + 18);
-  }
+  };
 
-  function codeApp(dt: number) {
+  const codeApp = (dt: number) => {
     const x = 70, y = 62, w = W - 140, h = H - 110;
     windowFrame('heartfelt.wgsl — study-room', x, y, w, h, true);
     typed = Math.min(CODE.length + 120, typed + dt * 38);
@@ -164,9 +164,9 @@ export function createScreen(room: Room) {
       ctx.fillStyle = MUSTARD;
       ctx.fillRect(cx + 1, y + 50 + (Math.min(lines.length, 17) - 1) * lh, 10, 20);
     }
-  }
+  };
 
-  function drawCodeLine(line: string, x: number, y: number) {
+  const drawCodeLine = (line: string, x: number, y: number) => {
     if (line.trim().startsWith('//')) {
       ctx.fillStyle = '#8a8178';
       ctx.fillText(line, x, y);
@@ -182,9 +182,9 @@ export function createScreen(room: Room) {
       ctx.fillText(part, cursor, y);
       cursor += ctx.measureText(part).width;
     }
-  }
+  };
 
-  function weatherApp() {
+  const weatherApp = () => {
     const x = 170, y = 72, w = W - 340, h = H - 134;
     windowFrame('weather', x, y, w, h);
     const wv = currentWeather();
@@ -202,9 +202,9 @@ export function createScreen(room: Room) {
     ctx.fillStyle = '#7a6f66';
     ctx.fillText(`${wv.snow > 0 ? `snow ${Math.round(wv.snow * 100)}%` : `rain on the window ${Math.round(wv.rain * 100)}%`} · clouds ${Math.round(wv.cloud * 100)}%`, x + 300, y + 280);
     ctx.fillText(state.weather.mode === 'manual' ? 'manual weather' : live ? `live · ${state.location.name}` : 'loading…', x + 300, y + 306);
-  }
+  };
 
-  function screensaver() {
+  const screensaver = () => {
     ctx.fillStyle = '#07090f';
     ctx.fillRect(0, 0, W, H);
     const h = currentHour();
@@ -219,9 +219,9 @@ export function createScreen(room: Room) {
     ctx.font = font(20, 500);
     ctx.fillStyle = 'rgba(232,220,198,0.3)';
     ctx.fillText('z z z — wave to wake me', px, py + 52);
-  }
+  };
 
-  function draw(dt: number, awake: number) {
+  const draw = (dt: number, awake: number) => {
     if (awake < 0.05) {
       screensaver();
       return;
@@ -231,12 +231,12 @@ export function createScreen(room: Room) {
     const app = currentApp();
     if (app === 'code') codeApp(dt);
     else weatherApp();
-  }
+  };
 
-  function currentApp(): ScreenApp {
+  const currentApp = (): ScreenApp => {
     if (state.screen.app !== 'auto') return state.screen.app;
     return SCREEN_APPS[appIndex];
-  }
+  };
 
   return {
     texture,
@@ -260,17 +260,17 @@ export function createScreen(room: Room) {
       appIndex = (appIndex + 1) % SCREEN_APPS.length;
     },
   };
-}
+};
 
-function weatherGlyph(c: Condition, hour: number): string {
+const weatherGlyph = (c: Condition, hour: number): string => {
   const night = hour < 6.5 || hour > 19.5;
   if (c === 'rain' || c === 'storm') return '☂';
   if (c === 'snow') return '❄';
   if (c === 'cloudy' || c === 'fog') return '☁';
   return night ? '☾' : '☀';
-}
+};
 
-function drawWeatherIcon(ctx: CanvasRenderingContext2D, c: Condition, hour: number, x: number, y: number, t: number) {
+const drawWeatherIcon = (ctx: CanvasRenderingContext2D, c: Condition, hour: number, x: number, y: number, t: number) => {
   const night = hour < 6.5 || hour > 19.5;
   if (c === 'clear') {
     ctx.fillStyle = night ? '#e3ecff' : MUSTARD;
@@ -327,4 +327,4 @@ function drawWeatherIcon(ctx: CanvasRenderingContext2D, c: Condition, hour: numb
     ctx.lineTo(x + 6, y + 54);
     ctx.fill();
   }
-}
+};

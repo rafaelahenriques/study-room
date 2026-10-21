@@ -5,26 +5,27 @@
 |---|---|
 | `blender/isometricroom.blend` | Your original scene, untouched |
 | `blender/isometricroom_enriched.blend` | The working scene with collections, materials, props and animations. Edit this one. |
-| `blender/bake_ao.py` | Bakes ambient occlusion into `web/public/textures/room_ao.jpg` and adds the `AO_UV` map (exported as `TEXCOORD_1`) |
-| `blender/export_glb.py` | Writes `web/public/models/study_room.glb` |
 | `blender/previews/` | Look-dev renders used in the README |
 
-Run from the `blender/` folder:
-```
-Blender -b isometricroom_enriched.blend -P bake_ao.py
-Blender -b isometricroom_enriched.blend -P export_glb.py
-```
+### Exporting again (only if the room changes)
+1. Set the `StudyRoom` empty's scale to **0.01** (the scene is modelled in centimetres; the GLB is in metres) and go to frame 1.
+2. Make `StudyRoom` the active collection, then *File → Export → glTF 2.0*:
+   - Format **glb**. *Include*: **Limit to → Active Collection** (with nested collections), **Custom Properties** on, cameras and lights off.
+   - *Transform*: **+Y Up**. *Mesh*: **Apply Modifiers**.
+   - *Animation*: mode **NLA Tracks**, **Always Sample Animations** on.
+   - Save as `web/public/models/study_room.glb`.
+3. Set the scale back to 1 before you save the `.blend`.
 
-**Baking:** `bake_ao.py` applies the modifiers of the baked objects first: the floor planks, walls, rug, desk top, riser, dresser, shelves and window sill. The bake needs their final geometry. A few other props had their modifiers applied by an earlier version of the bake: the pouf, blanket, floor books, pinboard, wall print, curtain rod, plant pot, desk legs and window frame. They look the same, but their bevels are now real geometry instead of a modifier.
+**Baking:** the AO atlas (`web/public/textures/room_ao.jpg`, 2048², Cycles *Ambient Occlusion*, distance 35 cm) is baked onto the second UV map `AO_UV` of the 10 static meshes that have it: `Room_FloorPlanks`, `Room_Walls`, `Rug`, `Desk_Top`, `Monitor_Riser`, `Dresser_Body`, `Shelf_1`–`Shelf_3`, `Window_Sill`. Their modifiers are applied (the bake needs final geometry). Re-bake only if those surfaces, or what stands on them, change: select the 10 objects, make `AO_UV` the active UV map on each, add an image node with `room_ao.jpg` to their materials and make it active, bake, then save the image over `web/public/textures/room_ao.jpg`.
 
 ## Scale and axes
 - The `.blend` is authored in **centimetres**. The export scales the `StudyRoom` root node by 0.01, so the GLB is in **metres**. The room is about 2.70 × 2.22 × 2.79 m.
 - The GLB is Y-up. The open sides of the room face −X and +Z (Three.js). A good default orbit target is `Anchor_CameraTarget`.
-- Size is about 4 MB and 77k triangles, with no compression. Running `gltf-transform meshopt` or Draco on it is an easy win if you need it.
+- Size is about 4.7 MB and 103k triangles (139 meshes, 46 materials, no embedded textures), with no compression.
 
 ## Interactive and independently accessible nodes
 Nodes with `userData.interactive` (glTF extras):
-`Lamp` (lamp), `Lamp_Switch` (lamp_switch), `Monitor_Screen` (monitor), `Window_Glass` (window), `Headphones` (headphones: plays music), `CameraProp` (camera), `Clock_Body` (clock), `Mug`, `Calendar_Stand` (calendar), `DeskPlant` / `FloorPlant` (plant), `Chair`, `Drawer_1`–`Drawer_3` (drawer), `Easel` / `Easel_Painting` (easel).
+`Lamp` (lamp), `Lamp_Switch` (lamp_switch), `Monitor_Screen` (monitor), `Window_Glass` (window), `Headphones` (headphones: plays music), `CameraProp` (camera), `Clock_Body` (clock), `Mug`, `Calendar_Root` (calendar), `ShelfBall_Root` (ball), `Notepad` (paper), `PaperBin` (bin), `DeskPlant` / `FloorPlant` (plant), `Chair`, `Drawer_1`–`Drawer_3` (drawer), `Easel` / `Easel_Painting` (easel). The website also tags `Shelf_1`–`Shelf_3` and their books as `shelf`. Tags without a website action (`camera`, `mug`, `plant`) aren't clickable.
 
 | Feature | Nodes | Notes |
 |---|---|---|

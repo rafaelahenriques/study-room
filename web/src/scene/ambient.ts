@@ -12,7 +12,7 @@ import type { Room } from './room';
  * particle is just darkening its instance colour.
  */
 
-function softDotTexture(): THREE.CanvasTexture {
+const softDotTexture = (): THREE.CanvasTexture => {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
   const ctx = c.getContext('2d')!;
@@ -25,9 +25,9 @@ function softDotTexture(): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
-}
+};
 
-function particles(count: number, map: THREE.Texture) {
+const particles = (count: number, map: THREE.Texture) => {
   const mesh = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
@@ -37,14 +37,14 @@ function particles(count: number, map: THREE.Texture) {
   mesh.frustumCulled = false;
   mesh.renderOrder = 2;
   return mesh;
-}
+};
 
 export interface AmbientInputs {
   /** 0 … 1 strength of direct sunlight through the window */
   sun: number;
 }
 
-export function createAmbient(scene: THREE.Scene, room: Room) {
+export const createAmbient = (scene: THREE.Scene, room: Room) => {
   const dot = softDotTexture();
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
@@ -136,4 +136,4 @@ export function createAmbient(scene: THREE.Scene, room: Room) {
       }
     },
   };
-}
+};

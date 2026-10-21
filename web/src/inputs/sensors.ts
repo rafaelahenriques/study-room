@@ -7,7 +7,7 @@ import { registerMotion, state } from '../state/roomState';
  *
  * Topics: studyroom/motion "1"/"0", studyroom/sound "0.0"–"1.0", studyroom/heartbeat.
  */
-export async function startSensors(): Promise<void> {
+export const startSensors = async (): Promise<void> => {
   const { url, username, password, topics, offlineAfterSeconds } = config.mqtt;
   if (!url) return;
 
@@ -37,4 +37,4 @@ export async function startSensors(): Promise<void> {
       state.sound.liveLevel = 0;
     }
   }, 2000);
-}
+};

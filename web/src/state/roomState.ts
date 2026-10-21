@@ -55,7 +55,8 @@ export const state = {
     sensorActive: false,
     sensorOnline: false,
   },
-  sound: { mode: 'live' as Mode, manualLevel: 0, liveLevel: 0 },
+  /** liveLevel: the sensor's last reading. spike: a short test noise from the panel (like a real sound) */
+  sound: { liveLevel: 0, spike: 0, spikeUntil: Number.NEGATIVE_INFINITY },
   screen: { app: 'auto' as 'auto' | ScreenApp },
   music: { playing: false, title: '', artist: '', volume: 0.6, level: 0 },
   /** date preview on the desk calendar: days after today (0 = today). Doesn't touch time or weather. */
@@ -63,7 +64,7 @@ export const state = {
 };
 
 /** Hour of day (0–24) at the room's location, or the manual hour. */
-export function currentHour(): number {
+export const currentHour = (): number => {
   if (state.time.mode === 'manual') return state.time.manualHour;
   const live = state.weather.live;
   if (live) {
@@ -72,22 +73,29 @@ export function currentHour(): number {
   }
   const d = new Date();
   return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-}
+};
 
-export function currentWeather(): WeatherLook {
+export const currentWeather = (): WeatherLook => {
   const { mode, manual, live } = state.weather;
   return mode === 'manual' || !live ? manual : live;
-}
+};
 
-export function registerMotion(now = performance.now()): void {
+export const registerMotion = (now = performance.now()): void => {
   state.motion.lastMotion = now;
-}
+};
 
-export function isAwake(now = performance.now()): boolean {
+export const isAwake = (now = performance.now()): boolean => {
   const m = state.motion;
   return m.keepAwake || m.sensorActive || state.music.playing || now - m.lastMotion < config.inactivitySeconds * 1000;
-}
+};
 
-export function soundLevel(): number {
-  return state.sound.mode === 'manual' ? state.sound.manualLevel : state.sound.liveLevel;
-}
+export const soundLevel = (now = performance.now()): number => {
+  const s = state.sound;
+  return Math.max(s.liveLevel, now < s.spikeUntil ? s.spike : 0);
+};
+
+/** a short burst of sound (0–1), as a sensor would report a clap or a bang */
+export const soundSpike = (level: number, ms = 150, now = performance.now()): void => {
+  state.sound.spike = level;
+  state.sound.spikeUntil = now + ms;
+};

@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import type { Room } from '../scene/room';
-import { state } from '../state/roomState';
+import { isAwake, state } from '../state/roomState';
 
 /**
  * Shows what can be clicked:
@@ -12,8 +12,8 @@ import { state } from '../state/roomState';
 /** what clicking each `interactive` kind does (kinds not listed here aren't clickable) */
 const ACTIONS: Record<string, () => string> = {
   window: () => 'Hold and drag to change the rain',
-  lamp: () => (state.motion.keepAwake ? 'Turn the lamp off' : 'Turn the lamp on'),
-  lamp_switch: () => (state.motion.keepAwake ? 'Turn the lamp off' : 'Turn the lamp on'),
+  lamp: () => (isAwake() ? 'Turn the lamp off' : 'Turn the lamp on'),
+  lamp_switch: () => (isAwake() ? 'Turn the lamp off' : 'Turn the lamp on'),
   headphones: () => (state.music.playing ? 'Stop the music' : 'Play lo-fi music'),
   monitor: () => 'Switch the screen app',
   chair: () => 'Spin the chair',
@@ -24,6 +24,7 @@ const ACTIONS: Record<string, () => string> = {
   bin: () => 'Paper bin (throw from the notepad)',
   calendar: () => 'Next day (date preview)',
   ball: () => 'Spin the globe',
+  easel: () => 'Doodle on the canvas',
 };
 export const isClickable = (kind: string) => kind in ACTIONS;
 
@@ -41,16 +42,17 @@ const HOTSPOTS: { node: string; kind: string; label: string; left?: boolean }[] 
   { node: 'Clock_Body', kind: 'clock', label: 'Clock' },
   { node: 'Calendar_Root', kind: 'calendar', label: 'Next day' },
   { node: 'ShelfBall_Root', kind: 'ball', label: 'Spin', left: true },
+  { node: 'Easel_Painting', kind: 'easel', label: 'Doodle' },
 ];
 
-export function createHints(room: Room, camera: THREE.Camera, dom: HTMLElement) {
+export const createHints = (room: Room, camera: THREE.Camera, dom: HTMLElement) => {
   // ---- hover glow: an additive copy of the hovered object's meshes, drawn at the same depth
   const glowMat = new THREE.MeshBasicMaterial({
     color: '#ffcf96', transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending,
     depthWrite: false, depthFunc: THREE.LessEqualDepth,
   });
   const glows = new Map<THREE.Object3D, THREE.Mesh[]>();
-  function glowFor(obj: THREE.Object3D) {
+  const glowFor = (obj: THREE.Object3D) => {
     let list = glows.get(obj);
     if (!list) {
       list = [];
@@ -68,7 +70,7 @@ export function createHints(room: Room, camera: THREE.Camera, dom: HTMLElement) 
       glows.set(obj, list);
     }
     return list;
-  }
+  };
 
   // ---- hover label next to the cursor
   const tip = document.createElement('div');
@@ -77,7 +79,7 @@ export function createHints(room: Room, camera: THREE.Camera, dom: HTMLElement) 
   document.body.appendChild(tip);
 
   let hovered: THREE.Object3D | null = null;
-  function hover(obj: THREE.Object3D | null, x: number, y: number) {
+  const hover = (obj: THREE.Object3D | null, x: number, y: number) => {
     if (obj !== hovered) {
       if (hovered) for (const g of glowFor(hovered)) g.visible = false;
       if (obj) for (const g of glowFor(obj)) g.visible = true;
@@ -92,7 +94,7 @@ export function createHints(room: Room, camera: THREE.Camera, dom: HTMLElement) 
     const flipX = x > window.innerWidth - 220;
     tip.style.transform = `translate(${flipX ? x - 14 : x + 16}px, ${y + 18}px) translateX(${flipX ? '-100%' : '0'})`;
     tip.classList.add('show');
-  }
+  };
 
   // ---- hotspots
   const layer = document.createElement('div');
@@ -148,4 +150,4 @@ export function createHints(room: Room, camera: THREE.Camera, dom: HTMLElement) 
       }
     },
   };
-}
+};

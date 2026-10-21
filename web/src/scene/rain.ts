@@ -10,12 +10,12 @@ import type { Node } from 'three/webgpu';
 import heartfeltShader from '../shaders/heartfelt/fragment.wgsl?raw';
 
 /** Lightning flicker from Heartfelt's USE_POST_PROCESSING, same formula as in the WGSL */
-function lightningAt(T: number): number {
+const lightningAt = (T: number): number => {
   const t = (T + 3) * 0.5;
   const fade = Math.min(1, Math.max(0, T / 10));
   const s = fade * fade * (3 - 2 * fade);
   return Math.sin(t * Math.sin(t * 10)) * Math.pow(Math.max(0, Math.sin(t + Math.sin(t))), 10) * s;
-}
+};
 
 export interface RainGlassOptions {
   dom: HTMLElement;
@@ -24,7 +24,7 @@ export interface RainGlassOptions {
   controls: { enabled: boolean };
 }
 
-export function createRainGlass(glass: THREE.Mesh, opts: RainGlassOptions) {
+export const createRainGlass = (glass: THREE.Mesh, opts: RainGlassOptions) => {
   // glass corners (by UV) — glTF puts v = 0 at the top of the glass
   const pos = glass.geometry.getAttribute('position');
   const uvs = glass.geometry.getAttribute('uv');
@@ -155,4 +155,4 @@ export function createRainGlass(glass: THREE.Mesh, opts: RainGlassOptions) {
       uniforms.screenV.value.copy(toScreen(c01, camera, s1)).sub(s0);
     },
   };
-}
+};

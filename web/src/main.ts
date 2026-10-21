@@ -8,6 +8,7 @@ import { createRainGlass } from './scene/rain';
 import { createOutsideView } from './scene/outside';
 import { createScreen } from './scene/screen';
 import { createCalendar } from './scene/calendar';
+import { createEasel } from './scene/easel';
 import { createAmbient } from './scene/ambient';
 import { applyBakedAO } from './scene/bakedAO';
 import { createMusic } from './inputs/music';
@@ -19,7 +20,7 @@ import { createPanel } from './ui/panel';
 import { toast } from './ui/toast';
 import { createHints, isClickable } from './ui/hints';
 import { loadingDone, loadingFailed, loadingStep } from './ui/loading';
-import { currentHour, currentWeather, isAwake, registerMotion, soundLevel, state } from './state/roomState';
+import { currentHour, currentWeather, isAwake, registerMotion, soundLevel, soundSpike, state } from './state/roomState';
 
 const VIEW_HEIGHT = 2.1; // metres visible vertically at zoom 1
 const VIEW_MIN_HALF_WIDTH = 2.0; // keeps the whole room in view on narrow (portrait) screens
@@ -27,7 +28,7 @@ const VIEW_MIN_HALF_WIDTH = 2.0; // keeps the whole room in view on narrow (port
 /** the browser can't run this (no WebGPU): the loading screen lists browsers that work */
 class NeedsWebGPU extends Error {}
 
-async function main() {
+const main = async () => {
   // the shaders are WGSL (wgslFn), so this needs real WebGPU — no WebGL2 fallback
   loadingStep('Starting WebGPU…', 0.02);
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown | null> } }).gpu;
@@ -144,8 +145,13 @@ async function main() {
       : r === 'paused' ? 'Music off' : 'Music unavailable right now (Audius could not be reached)'));
 
   const panel = createPanel({
-    simulateMotion: () => registerMotion(),
-    soundBump,
+    simulateMotion: () => {
+      const wasAwake = isAwake();
+      registerMotion();
+      toast(wasAwake ? 'Motion seen: the room stays awake for another minute' : 'Motion seen: the room wakes up');
+    },
+    smallNoise: () => soundSpike(config.testSounds.small),
+    loudBang: () => soundSpike(config.testSounds.loud),
     toggleMusic,
     nextTrack: () => music.next(),
     findCities: (q) => findCities(q),
@@ -164,13 +170,25 @@ async function main() {
   });
 
   const hints = createHints(room, camera, renderer.domElement);
+  const easel = createEasel(room, { camera, controls, dom: renderer.domElement, toast });
   new Interactions(camera, renderer.domElement, room, (kind, obj) => {
+    if (easel.active) return;                          // while doodling, clicks are brush strokes
     switch (kind) {
+      case 'easel':
+        easel.enter();
+        break;
       case 'lamp':
       case 'lamp_switch':
-        state.motion.keepAwake = !state.motion.keepAwake;
-        if (!state.motion.keepAwake) state.motion.lastMotion = Number.NEGATIVE_INFINITY;
-        toast(state.motion.keepAwake ? 'Lamp on' : 'Lamp off');
+        // the lamp shows whether the room is awake (motion, music, sensor or the panel's toggle)
+        if (isAwake()) {
+          state.motion.keepAwake = false;
+          state.motion.lastMotion = Number.NEGATIVE_INFINITY;
+          toast(state.music.playing ? 'The lamp stays on while music plays'
+            : state.motion.sensorActive ? 'The lamp stays on while the sensor sees motion' : 'Lamp off');
+        } else {
+          state.motion.keepAwake = true;
+          toast('Lamp on');
+        }
         break;
       case 'drawer':
         toast(room.toggleDrawer(obj.name) ? 'Opening the drawer…' : 'Closing the drawer');
@@ -215,7 +233,7 @@ async function main() {
         break;
       }
     }
-  }, hints.hover, isClickable);
+  }, (o, x, y) => hints.hover(easel.active ? null : o, x, y), isClickable);
 
   void startWeather();
   void startSensors();
@@ -228,7 +246,7 @@ async function main() {
   hints.flash(7);
 
   const timer = new THREE.Timer();
-  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, calendar, get physics() { return physics; } } });
+  if (import.meta.env.DEV) Object.assign(window, { __room: { state, room, lighting, camera, controls, glass, outside, monitor, music, renderer, calendar, easel, get physics() { return physics; } } });
   let prevAwake = false;
   let lastBooksFall = -Infinity;
   let statusTimer = 0;
@@ -288,7 +306,8 @@ async function main() {
     calendar.update(dt);
     room.update(dt);
     physics?.update(dt);
-    controls.update();
+    easel.update(dt);
+    if (!easel.active) controls.update();              // the easel flies the camera itself
     renderer.render(scene, camera);
     hints.update();
 
@@ -308,7 +327,7 @@ async function main() {
   window.addEventListener('resize', resize);
   // a page opened in a hidden or zero-sized frame gets no resize event when it appears
   new ResizeObserver(resize).observe(document.documentElement);
-}
+};
 
 main().catch((err) => {
   console.error(err);

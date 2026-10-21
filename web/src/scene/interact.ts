@@ -34,7 +34,10 @@ export class Interactions {
       // ignore drags (camera orbit)
       if (!this.downAt || Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y) > 5) return;
       const hit = this.pick(e);
-      if (hit) this.onPick(hit.userData.interactive as string, hit);
+      if (!hit) return;
+      this.onPick(hit.userData.interactive as string, hit);
+      // the action may change what the label says (lamp on/off, music on/off)
+      if (e.pointerType !== 'touch') this.onHover(hit, e.clientX, e.clientY);
     });
   }
 

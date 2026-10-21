@@ -40,7 +40,7 @@ export interface Physics {
 }
 
 /** world-space triangle soup of every mesh under `node` */
-function worldTriangles(node: THREE.Object3D) {
+const worldTriangles = (node: THREE.Object3D) => {
   const verts: number[] = [];
   const idx: number[] = [];
   const v = new THREE.Vector3();
@@ -59,10 +59,10 @@ function worldTriangles(node: THREE.Object3D) {
     else for (let i = 0; i < pos.count; i++) idx.push(base + i);
   });
   return { verts: new Float32Array(verts), idx: new Uint32Array(idx) };
-}
+};
 
 /** a crumpled-paper ball: an icosphere with jittered vertices (shared by all balls) */
-function paperGeometry(radius: number) {
+const paperGeometry = (radius: number) => {
   const g = new THREE.IcosahedronGeometry(radius, 1);
   const pos = g.getAttribute('position');
   const v = new THREE.Vector3();
@@ -73,9 +73,9 @@ function paperGeometry(radius: number) {
   }
   g.computeVertexNormals();
   return g;
-}
+};
 
-export async function createPhysics(scene: THREE.Scene, room: Room, onScore: (count: number) => void): Promise<Physics> {
+export const createPhysics = async (scene: THREE.Scene, room: Room, onScore: (count: number) => void): Promise<Physics> => {
   const RAPIER = (await import('@dimforge/rapier3d-compat')).default;
   await RAPIER.init();
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
@@ -136,7 +136,7 @@ export async function createPhysics(scene: THREE.Scene, room: Room, onScore: (co
   const sDummy = new THREE.Vector3();
   const sDummyQ = new THREE.Quaternion();
   const sWorld = new THREE.Matrix4();
-  function syncNode(node: THREE.Object3D, body: RigidBody) {
+  const syncNode = (node: THREE.Object3D, body: RigidBody) => {
     // body pose is world space; the node lives under the (scaled) StudyRoom root
     const t = body.translation();
     const r = body.rotation();
@@ -146,7 +146,7 @@ export async function createPhysics(scene: THREE.Scene, room: Room, onScore: (co
     sWorld.compose(sPos.set(t.x, t.y, t.z), sQuat.set(r.x, r.y, r.z, r.w), sScale);
     node.matrix.copy(parent.matrixWorld).invert().multiply(sWorld);
     node.matrix.decompose(node.position, node.quaternion, node.scale);
-  }
+  };
 
   let accumulator = 0;
   const anyAwake = () => papers.length > 0 || books.some((b) => b.body.isDynamic() && !b.body.isSleeping());
@@ -238,4 +238,4 @@ export async function createPhysics(scene: THREE.Scene, room: Room, onScore: (co
       }
     },
   };
-}
+};

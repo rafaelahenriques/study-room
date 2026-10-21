@@ -4,7 +4,8 @@ import { CONDITION_PRESETS, currentHour, state, type Condition } from '../state/
 
 export interface PanelActions {
   simulateMotion(): void;
-  soundBump(): void;
+  smallNoise(): void;
+  loudBang(): void;
   toggleMusic(): void;
   nextTrack(): void;
   findCities(query: string): Promise<Place[]>;
@@ -22,8 +23,8 @@ export interface PanelActions {
 /**
  * Room controls: a compact panel with three tabs. The header always shows what the room is
  * using right now (city · time · weather), so the panel can stay collapsed.
- * Touching a weather, time or sound control switches that input to manual; "Back to live"
- * clears every override. Works with or without sensors.
+ * Touching a weather or time control switches that input to manual; "Back to live"
+ * clears every override. The sound buttons send one short spike, like the sensor would. Works with or without sensors.
  */
 
 const CONDITIONS: Condition[] = ['clear', 'cloudy', 'fog', 'rain', 'storm', 'snow'];
@@ -32,14 +33,14 @@ const RAINY = new Set<Condition>(['rain', 'storm']);   // these show a rain-inte
 const hhmm = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function store(key: string, value?: string): string | null {
+const store = (key: string, value?: string): string | null => {
   try {
     if (value !== undefined) localStorage.setItem(`studyroom.${key}`, value);
     return localStorage.getItem(`studyroom.${key}`);
   } catch {
     return null;
   }
-}
+};
 
 const HTML = `
 <button class="ctl-head" id="ctl-toggle" type="button" aria-expanded="true" aria-controls="ctl-body">
@@ -105,8 +106,8 @@ const HTML = `
       <p class="ctl-hint" id="cal-status"></p>
     </div>
     <div class="ctl-field">
-      <span class="ctl-label">Lamp</span>
-      <div class="chips"><button type="button" id="lamp-btn">Keep the lamp on</button></div>
+      <span class="ctl-label">Lamp and screen</span>
+      <div class="chips"><button type="button" id="lamp-btn">Keep the room awake</button></div>
     </div>
     <div class="ctl-field">
       <span class="ctl-label" id="s-label">Screen</span>
@@ -149,23 +150,19 @@ const HTML = `
       <div class="chips"><button type="button" id="motion-btn">Simulate motion</button></div>
     </div>
     <div class="ctl-field">
-      <span class="ctl-label" id="snd-label">Sound level</span>
-      <div class="chips" role="group" aria-labelledby="snd-label">
-        <button type="button" data-sound="live">From sensor</button>
-        <button type="button" data-sound="manual">Set by hand</button>
-        <button type="button" id="noise-btn">Make a noise</button>
+      <span class="ctl-label">Sound</span>
+      <div class="chips">
+        <button type="button" id="small-noise-btn">Small noise</button>
+        <button type="button" id="loud-bang-btn">Loud bang</button>
       </div>
-      <div class="ctl-row" id="sound-row" hidden>
-        <input type="range" id="sound-range" min="0" max="1" step="0.01" aria-label="Sound level">
-        <output id="sound-out" for="sound-range"></output>
-      </div>
+      <p class="ctl-hint">Small noise wiggles the headphones. Loud bang also knocks the books off.</p>
     </div>
   </div>
 
   <button class="ctl-reset" id="ctl-reset" type="button">Back to live</button>
 </div>`;
 
-export function createPanel(actions: PanelActions) {
+export const createPanel = (actions: PanelActions) => {
   const root = document.createElement('aside');
   root.id = 'controls';
   root.setAttribute('aria-label', 'Room controls');
@@ -361,26 +358,21 @@ export function createPanel(actions: PanelActions) {
   $('#tidy-btn').addEventListener('click', () => actions.tidyBooks());
 
   // ---- sensors
-  $('#motion-btn').addEventListener('click', () => actions.simulateMotion());
-  $('#noise-btn').addEventListener('click', () => actions.soundBump());
-  const soundRange = $<HTMLInputElement>('#sound-range');
-  for (const b of $$<HTMLButtonElement>('[data-sound]')) {
-    b.addEventListener('click', () => {
-      state.sound.mode = b.dataset.sound as 'live' | 'manual';
-      refreshNow();
-    });
-  }
-  soundRange.addEventListener('input', () => {
-    state.sound.manualLevel = Number(soundRange.value);
-    state.sound.mode = 'manual';
-    refreshNow();
+  $('#motion-btn').addEventListener('click', () => {
+    actions.simulateMotion();
+    // a short highlight on the status line, also when the room was already awake
+    const status = $('#room-status');
+    status.classList.remove('pulse');
+    void status.offsetWidth;                     // restart the animation
+    status.classList.add('pulse');
   });
+  $('#small-noise-btn').addEventListener('click', () => actions.smallNoise());
+  $('#loud-bang-btn').addEventListener('click', () => actions.loudBang());
 
   // ---- back to live
   $('#ctl-reset').addEventListener('click', () => {
     state.time.mode = 'live';
     state.weather.mode = 'live';
-    state.sound.mode = 'live';
     state.motion.keepAwake = false;
     state.screen.app = 'auto';
     refreshNow();
@@ -391,10 +383,10 @@ export function createPanel(actions: PanelActions) {
   const setRange = (el: HTMLInputElement, v: number) => {
     if (document.activeElement !== el) el.value = String(v);
   };
-  function refreshNow() {
+  const refreshNow = () => {
     refresh(lastAwake);
-  }
-  function refresh(awake: boolean) {
+  };
+  const refresh = (awake: boolean) => {
     lastAwake = awake;
     const live = state.weather.live;
     const manualW = state.weather.mode === 'manual';
@@ -449,16 +441,9 @@ export function createPanel(actions: PanelActions) {
     $('#sensor-status').textContent = !config.mqtt.url ? 'Not connected (optional)'
       : state.motion.sensorOnline ? (state.motion.sensorActive ? 'Live, motion' : 'Live, no motion') : 'Offline';
     $('#room-status').textContent = awake ? 'Awake' : 'Asleep';
-    for (const b of $$('[data-sound]')) press(b, b.dataset.sound === state.sound.mode);
-    const manualS = state.sound.mode === 'manual';
-    $('#sound-row').hidden = !manualS;
-    if (manualS) {
-      setRange(soundRange, state.sound.manualLevel);
-      $('#sound-out').textContent = `${Math.round(state.sound.manualLevel * 100)}%`;
-    }
 
-    $('#ctl-reset').hidden = !(manualW || manualT || state.sound.mode === 'manual' || state.motion.keepAwake || state.screen.app !== 'auto');
-  }
+    $('#ctl-reset').hidden = !(manualW || manualT || state.motion.keepAwake || state.screen.app !== 'auto');
+  };
 
   return { refresh };
-}
+};

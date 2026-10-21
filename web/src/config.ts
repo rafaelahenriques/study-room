@@ -1,9 +1,16 @@
+/**
+ * Site settings. Nothing secret lives in this file or in the repository:
+ * - Open-Meteo and Audius need no API key.
+ * - The optional MQTT settings come from environment variables (web/.env.local or Netlify),
+ *   and like every VITE_ value they end up readable in the browser, so use a subscribe-only
+ *   broker user (see firmware/README.md).
+ */
 const env = import.meta.env;
 
-function num(value: string | undefined, fallback: number): number {
+const num = (value: string | undefined, fallback: number): number => {
   const n = Number(value);
   return value && Number.isFinite(n) ? n : fallback;
-}
+};
 
 export const config = {
   modelUrl: `${import.meta.env.BASE_URL}models/study_room.glb`,
@@ -14,6 +21,7 @@ export const config = {
     refreshMinutes: 15,
   },
 
+  /** empty unless VITE_MQTT_URL is set: then the sensor client loads */
   mqtt: {
     url: env.VITE_MQTT_URL ?? '',
     username: env.VITE_MQTT_USER ?? '',
@@ -27,7 +35,7 @@ export const config = {
   },
 
   music: {
-    /** Audius public API (no key needed). app_name identifies this site to Audius. */
+    /** Audius public API, no key. app_name is a public label Audius asks apps to send, not a secret. */
     api: 'https://api.audius.co',
     appName: 'STUDY_ROOM',
     genre: 'Lo-Fi',
@@ -41,4 +49,6 @@ export const config = {
   soundBumpCooldownSeconds: 1.5,
   /** Sound level (0–1) loud enough to knock the books off the shelves. */
   booksFallThreshold: 0.85,
+  /** Test noises in the panel: one between the two thresholds, one above both. */
+  testSounds: { small: 0.72, loud: 0.95 },
 };

@@ -2,16 +2,16 @@ import { config } from '../config';
 import { CONDITION_PRESETS, state, type Condition, type LiveWeather, type LocationSource } from '../state/roomState';
 
 /** WMO weather codes → room condition. https://open-meteo.com/en/docs */
-function conditionFromCode(code: number): Condition {
+const conditionFromCode = (code: number): Condition => {
   if (code >= 95) return 'storm';
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
   if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rain';
   if (code === 45 || code === 48) return 'fog';
   if (code >= 2) return 'cloudy';
   return 'clear';
-}
+};
 
-async function fetchWeather(): Promise<void> {
+const fetchWeather = async (): Promise<void> => {
   const { lat, lon } = state.location;
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
@@ -39,7 +39,7 @@ async function fetchWeather(): Promise<void> {
   } catch (err) {
     state.weather.error = err instanceof Error ? err.message : String(err);
   }
-}
+};
 
 /* ---------------- location: the visitor's city ----------------
  * Default: the city of the browser's time zone (e.g. "Europe/Brussels" → Brussels), found with
@@ -53,7 +53,7 @@ export interface Place { name: string; detail: string; lat: number; lon: number 
 interface GeoHit { name: string; country?: string; admin1?: string; latitude: number; longitude: number }
 
 /** up to `count` places matching `name` (Open-Meteo geocoding) */
-export async function findCities(name: string, count = 5): Promise<Place[]> {
+export const findCities = async (name: string, count = 5): Promise<Place[]> => {
   const res = await fetch(`${GEOCODE}?name=${encodeURIComponent(name)}&count=${count}&language=en&format=json`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const hits = ((await res.json()).results ?? []) as GeoHit[];
@@ -63,38 +63,31 @@ export async function findCities(name: string, count = 5): Promise<Place[]> {
     lat: h.latitude,
     lon: h.longitude,
   }));
-}
+};
 
-async function geocode(name: string) {
+const geocode = async (name: string) => {
   const hit = (await findCities(name, 1))[0];
   if (!hit) throw new Error(`"${name}" not found`);
   return hit;
-}
+};
 
 let timer: number | undefined;
 
 /** use a place picked from findCities() */
-export function chooseCity(place: Place): void {
+export const chooseCity = (place: Place): void => {
   setLocation(place, 'search');
-}
+};
 
-function setLocation(place: { name: string; lat: number; lon: number }, source: LocationSource) {
+const setLocation = (place: { name: string; lat: number; lon: number }, source: LocationSource) => {
   state.location = { name: place.name, lat: place.lat, lon: place.lon, source };
   state.weather.live = null;
   void fetchWeather();
   window.clearInterval(timer);
   timer = window.setInterval(fetchWeather, config.weather.refreshMinutes * 60 * 1000);
-}
-
-/** search a city by name (panel) */
-export async function searchCity(name: string): Promise<string> {
-  const place = await geocode(name);
-  setLocation(place, 'search');
-  return place.name;
-}
+};
 
 /** the device's position (asks the visitor for permission) */
-export function useDeviceLocation(): Promise<void> {
+export const useDeviceLocation = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('geolocation not available'));
     navigator.geolocation.getCurrentPosition(
@@ -106,9 +99,9 @@ export function useDeviceLocation(): Promise<void> {
       { timeout: 10000, maximumAge: 10 * 60 * 1000 },
     );
   });
-}
+};
 
-export async function startWeather(): Promise<void> {
+export const startWeather = async (): Promise<void> => {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? '';
   const city = tz.includes('/') ? tz.split('/').pop()!.replace(/_/g, ' ') : '';
   try {
@@ -117,4 +110,4 @@ export async function startWeather(): Promise<void> {
   } catch {
     setLocation({ name: state.location.name, lat: state.location.lat, lon: state.location.lon }, 'default');
   }
-}
+};

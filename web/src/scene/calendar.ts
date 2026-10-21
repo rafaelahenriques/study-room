@@ -22,14 +22,14 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /** today's local date plus `offset` days (Date handles month and year boundaries) */
-export function previewDate(offset = state.calendar.offsetDays): Date {
+const previewDate = (offset = state.calendar.offsetDays): Date => {
   const d = new Date();
   d.setHours(12, 0, 0, 0); // midday: no daylight-saving edge cases
   d.setDate(d.getDate() + offset);
   return d;
-}
+};
 
-function dateCanvas() {
+const dateCanvas = () => {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -59,9 +59,9 @@ function dateCanvas() {
       tex.needsUpdate = true;
     },
   };
-}
+};
 
-export function createCalendar(room: Room, setDayDip: (v: number) => void) {
+export const createCalendar = (room: Room, setDayDip: (v: number) => void) => {
   const page = dateCanvas();
   const surface = dateCanvas();
   const pageMat = new THREE.MeshStandardMaterial({ map: page.tex, roughness: 0.9, transparent: true });
@@ -147,4 +147,4 @@ export function createCalendar(room: Room, setDayDip: (v: number) => void) {
       return n === 0 ? `${text} (today)` : `${text} (+${n} day${n === 1 ? '' : 's'}, preview)`;
     },
   };
-}
+};

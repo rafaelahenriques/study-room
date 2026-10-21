@@ -189,7 +189,9 @@ html, body {
 .ctl-status { margin: 0; display: grid; gap: 4px; }
 .ctl-status div { display: flex; justify-content: space-between; gap: 8px; }
 .ctl-status dt { color: var(--muted); }
-.ctl-status dd { margin: 0; font-weight: 600; }
+.ctl-status dd { margin: 0; font-weight: 600; border-radius: 6px; padding: 0 4px; }
+.ctl-status dd.pulse { animation: pulse 0.9s ease-out; }
+@keyframes pulse { from { background: var(--accent); color: var(--paper); } to { background: transparent; } }
 
 .ctl-reset { border: 0; border-radius: 9px; padding: 8px; background: var(--chip); cursor: pointer; font-weight: 600; }
 .ctl-reset:hover { background: var(--chip-hover); }
@@ -230,6 +232,23 @@ html, body {
   font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(59, 54, 51, 0.18);
 }
 
+/* ---------- doodle toolbar (easel) ---------- */
+#doodle-bar {
+  position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 8;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; max-width: calc(100vw - 24px);
+  padding: 10px 12px; border-radius: 14px; background: rgba(246, 241, 231, 0.96);
+  box-shadow: 0 10px 30px rgba(59, 54, 51, 0.2), 0 0 0 1px var(--line); font-size: 13px;
+}
+#doodle-bar[hidden] { display: none; }
+.doodle-group { display: flex; gap: 6px; align-items: center; }
+#doodle-bar button { font: inherit; color: var(--ink); border: 0; cursor: pointer; }
+#doodle-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swatch { width: 28px; height: 28px; border-radius: 50%; background: var(--c) !important; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6); }
+.swatch.eraser { background: #f4efe6 !important; box-shadow: inset 0 0 0 1px var(--line); font-size: 12px; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+.size, #doodle-bar .doodle-group:last-child button { padding: 6px 11px; border-radius: 999px; background: var(--chip); }
+.size[aria-pressed="true"], #doodle-bar .primary { background: var(--ink) !important; color: var(--paper) !important; }
+
 /* small screens: keep the now-playing pill and captions above the credits line */
 @media (max-width: 600px) {
   #nowplaying { bottom: 84px; }
@@ -239,6 +258,6 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   #toast, #loading, #hotspots, #hover-tip { transition: none; }
-  .loading-window i, .hs-dot::after { animation: none; }
+  .loading-window i, .hs-dot::after, .ctl-status dd.pulse { animation: none; }
   .loading-window i { top: 30%; }
 }

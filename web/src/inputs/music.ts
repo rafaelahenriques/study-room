@@ -30,7 +30,7 @@ interface AudiusTrack {
 
 const FADE_SECONDS = 1.2;
 
-export function createMusic() {
+export const createMusic = () => {
   const { api, appName, genre } = config.music;
   const audio = new Audio();
   audio.crossOrigin = 'anonymous';
@@ -54,7 +54,7 @@ export function createMusic() {
   let fadeTarget = 0;
   let loading: Promise<void> | null = null;
 
-  async function loadQueue() {
+  const loadQueue = async () => {
     const res = await fetch(`${api}/v1/tracks/trending?genre=${encodeURIComponent(genre)}&time=month&app_name=${appName}`);
     if (!res.ok) throw new Error(`Audius HTTP ${res.status}`);
     const { data } = (await res.json()) as { data: AudiusTrack[] };
@@ -72,10 +72,10 @@ export function createMusic() {
       [queue[i], queue[j]] = [queue[j], queue[i]];
     }
     index = -1;
-  }
+  };
 
   /** WebAudio is created on the first click (browsers require a user gesture). */
-  function ensureAudioGraph() {
+  const ensureAudioGraph = () => {
     if (ctx) return;
     ctx = new AudioContext();
     const source = ctx.createMediaElementSource(audio);
@@ -83,9 +83,9 @@ export function createMusic() {
     analyser.fftSize = 512;
     samples = new Uint8Array(analyser.fftSize);
     source.connect(analyser).connect(ctx.destination);
-  }
+  };
 
-  async function playIndex(i: number) {
+  const playIndex = async (i: number) => {
     const track = queue[i];
     index = i;
     audio.src = `${api}/v1/tracks/${track.id}/stream?app_name=${appName}`;
@@ -97,9 +97,9 @@ export function createMusic() {
     ui.art.src = track.artwork ?? '';
     ui.art.hidden = !track.artwork;
     await audio.play();
-  }
+  };
 
-  async function next(): Promise<void> {
+  const next = async (): Promise<void> => {
     if (!queue.length) throw new Error('no playable tracks');
     try {
       await playIndex((index + 1) % queue.length);
@@ -109,11 +109,11 @@ export function createMusic() {
       index -= 1;
       await next();
     }
-  }
+  };
   /** for event handlers: stop quietly when nothing can be played */
   const nextOrStop = () => void next().catch(() => pause());
 
-  async function play() {
+  const play = async () => {
     ensureAudioGraph();
     await ctx!.resume();
     if (!queue.length) {
@@ -126,13 +126,13 @@ export function createMusic() {
     registerMotion();
     if (index < 0 || !audio.src) await next();
     else await audio.play();
-  }
+  };
 
-  function pause() {
+  const pause = () => {
     fadeTarget = 0;
     state.music.playing = false;
     ui.root.hidden = true;
-  }
+  };
 
   audio.addEventListener('ended', nextOrStop);
   audio.addEventListener('error', () => {
@@ -179,4 +179,4 @@ export function createMusic() {
       state.music.level += (level - state.music.level) * Math.min(1, dt * 12);
     },
   };
-}
+};

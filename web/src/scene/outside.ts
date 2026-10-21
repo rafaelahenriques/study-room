@@ -19,12 +19,12 @@ import snowShader from '../shaders/snow/fragment.wgsl?raw';
 const W = 512;
 const H = 416; // backdrop quad is 160 × 130 cm
 
-function rand(seed: number) {
+const rand = (seed: number) => {
   let s = seed;
   return () => ((s = (s * 16807) % 2147483647) / 2147483647);
-}
+};
 
-function paintLayer(draw: (ctx: CanvasRenderingContext2D) => void): Uint8ClampedArray {
+const paintLayer = (draw: (ctx: CanvasRenderingContext2D) => void): Uint8ClampedArray => {
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
@@ -34,9 +34,9 @@ function paintLayer(draw: (ctx: CanvasRenderingContext2D) => void): Uint8Clamped
   ctx.fillStyle = '#fff';
   draw(ctx);
   return ctx.getImageData(0, 0, W, H).data;
-}
+};
 
-function buildMasks(): THREE.DataTexture {
+const buildMasks = (): THREE.DataTexture => {
   const r = rand(7);
 
   const hills = paintLayer((ctx) => {
@@ -121,7 +121,7 @@ function buildMasks(): THREE.DataTexture {
   tex.colorSpace = THREE.NoColorSpace;
   tex.needsUpdate = true;
   return tex;
-}
+};
 
 const C = (hex: string) => new THREE.Color(hex);
 const P = {
@@ -133,12 +133,12 @@ const P = {
 };
 
 /** Colour uniform as vec3 (TSL mixes vec3 nodes cleanly). */
-function colorUniform(c: THREE.Color) {
+const colorUniform = (c: THREE.Color) => {
   return uniform(new THREE.Vector3(c.r, c.g, c.b));
-}
-function setColor(u: { value: THREE.Vector3 }, c: THREE.Color) {
+};
+const setColor = (u: { value: THREE.Vector3 }, c: THREE.Color) => {
   u.value.set(c.r, c.g, c.b);
-}
+};
 
 export interface OutsideInputs {
   hour: number;
@@ -151,7 +151,7 @@ export interface OutsideInputs {
   flash?: number;
 }
 
-export function createOutsideView(room: Room) {
+export const createOutsideView = (room: Room) => {
   const masks = buildMasks();
   const u = {
     zenith: colorUniform(P.zenith.day),
@@ -220,8 +220,6 @@ export function createOutsideView(room: Room) {
 
   let snowEased = 0;
   return {
-    /** eased snow intensity currently drawn (0 … 1) */
-    get snow() { return snowEased; },
     update(i: OutsideInputs, dt: number) {
       const elev = Math.sin((Math.PI * (i.hour - 6)) / 12);
       const dawn = (1 - smoothstepJS(0.0, 0.35, Math.abs(elev))) * Math.min(1, i.day * 2);
@@ -249,9 +247,9 @@ export function createOutsideView(room: Room) {
       u.orbGlow.value = (isDay ? i.day : 1 - i.day) * (1 - 0.9 * i.overcast);
     },
   };
-}
+};
 
-function smoothstepJS(a: number, b: number, x: number) {
+const smoothstepJS = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
-}
+};

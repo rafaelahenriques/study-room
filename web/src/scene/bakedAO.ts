@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import type { Room } from './room';
 
 /**
- * Ambient occlusion baked in Blender (blender/bake_ao.py, Cycles) into one atlas:
+ * Ambient occlusion baked in Blender (Cycles) into one atlas:
  * web/public/textures/room_ao.jpg. The baked meshes carry a second UV map (glTF TEXCOORD_1
  * → three.js `uv1`), so the texture is used as `aoMap` on channel 1.
  *
@@ -11,7 +11,7 @@ import type { Room } from './room';
  * weather and the desk lamp. aoMap darkens the ambient/hemisphere light in the corners,
  * under the furniture and behind the shelves.
  */
-export async function applyBakedAO(room: Room, url: string, intensity = 1): Promise<number> {
+export const applyBakedAO = async (room: Room, url: string, intensity = 1): Promise<number> => {
   const ao = await new THREE.TextureLoader().loadAsync(url);
   ao.flipY = false;                 // glTF UVs: no flip (same as the course's baked.jpg)
   ao.colorSpace = THREE.NoColorSpace; // occlusion is data, not a colour
@@ -37,4 +37,4 @@ export async function applyBakedAO(room: Room, url: string, intensity = 1): Prom
     count++;
   });
   return count;
-}
+};
